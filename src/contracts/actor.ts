@@ -65,8 +65,17 @@ export const AgentActor = ActorBase.extend({
   domain: z.string().min(1).optional(),
   /** Role within the domain (pipeline-ops, script-writer, …). */
   role: z.string().min(1).optional(),
-  /** Tenant / company scope for multi-venture isolation. */
+  /**
+   * Tenant scope for multi-organization isolation (Mission 003).
+   * Required for agent-driven work at the Runtime boundary.
+   */
   tenantId: z.string().min(1).optional(),
+  /** Optional company within the tenant. */
+  companyId: z.string().min(1).optional(),
+  /** Optional venture within the company. */
+  ventureId: z.string().min(1).optional(),
+  /** Optional project within the venture. */
+  projectId: z.string().min(1).optional(),
   /** The one job this agent exists to do. */
   purpose: z.string().min(1),
   /** The human or team accountable for this agent. */

@@ -5,6 +5,7 @@ import {
   RequestId,
   MissionId,
   ActorId,
+  ExecutionId,
 } from './identifiers.js';
 import { RiskLevel } from './risk.js';
 import { Command } from './command.js';
@@ -34,6 +35,13 @@ export const ApprovalRequest = z.object({
   runId: RunId,
   requestId: RequestId,
   missionId: MissionId.optional(),
+  /**
+   * Mission 003: approvals are bound to a single execution. Using an approval
+   * from execution A against execution B is DENY.
+   */
+  executionId: ExecutionId.optional(),
+  /** Tenant that owns this approval — cross-tenant reuse is DENY. */
+  tenantId: z.string().min(1).optional(),
   /** The full proposed action, so the run can resume deterministically. */
   command: Command,
   /** The centrally classified risk that triggered the gate. */
@@ -48,6 +56,10 @@ export const ApprovalRequest = z.object({
   decidedBy: ActorId.optional(),
   /** Optional free-text note from the approver. */
   note: z.string().optional(),
+  /** After this timestamp the approval is invalid (stale / expired). */
+  expiresAt: z.string().datetime().optional(),
+  /** Once consumed for execute, cannot be replayed. */
+  consumedAt: z.string().datetime().optional(),
 });
 export type ApprovalRequest = z.infer<typeof ApprovalRequest>;
 
