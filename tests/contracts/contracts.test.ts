@@ -7,9 +7,16 @@ import {
   createAgentActor,
   createMission,
   createTool,
+  createExecutionObject,
+  formatAgentUri,
+  parseAgentUri,
+  ExecutionObject,
   EVENT_TYPES,
   newRequestId,
   newCommandId,
+  newRunId,
+  newCorrelationId,
+  newActorId,
 } from '../../src/index.js';
 
 describe('contract validation', () => {
@@ -82,5 +89,62 @@ describe('contract validation', () => {
       riskLevel: 'R1',
     });
     expect(tool.toolId).toMatch(/^tool_/);
+  });
+
+  it('mints canonical agent://aion/{domain}/{role}/{id} identity fields', () => {
+    const agent = createAgentActor({
+      name: 'Pipeline Ops',
+      purpose: 'qualify leads',
+      owner: 'revenue',
+      domain: 'revenue',
+      role: 'pipeline-ops',
+      permissions: [capability('research.summary')],
+      allowedData: ['crm.leads.read'],
+      autonomyLevel: 'L2',
+      evaluationCriteria: ['revenue.lead.qualify@1'],
+      observabilityRequirements: ['telemetry.cost', 'events.lifecycle'],
+    });
+    expect(agent.agentUri).toBe(
+      formatAgentUri({
+        domain: 'revenue',
+        role: 'pipeline-ops',
+        id: agent.agentId,
+      }),
+    );
+    expect(parseAgentUri(agent.agentUri!).domain).toBe('revenue');
+    expect(agent.allowedData).toEqual(['crm.leads.read']);
+    expect(agent.autonomyLevel).toBe('L2');
+  });
+
+  it('builds a canonical Execution Object from a run + agent', () => {
+    const agent = createAgentActor({
+      name: 'A',
+      purpose: 'p',
+      owner: 'o',
+      domain: 'revenue',
+      role: 'copilot',
+      tenantId: 'aion-systems',
+    });
+    const now = new Date().toISOString();
+    const run = {
+      runId: newRunId(),
+      requestId: newRequestId(),
+      commandId: newCommandId(),
+      actorId: agent.actorId,
+      state: 'completed' as const,
+      riskLevel: 'R1' as const,
+      correlationId: newCorrelationId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    const exe = createExecutionObject({ run, agent });
+    expect(exe.executionId).toMatch(/^exe_/);
+    expect(exe.agentUri).toBe(agent.agentUri);
+    expect(exe.status).toBe('succeeded');
+    expect(exe.tenantId).toBe('aion-systems');
+    expect(ExecutionObject.parse(exe).auditTrace.length).toBeGreaterThan(0);
+    // actorId brand is preserved through the factory.
+    expect(exe.actorId).toBe(agent.actorId);
+    expect(exe.actorId).not.toBe(newActorId());
   });
 });

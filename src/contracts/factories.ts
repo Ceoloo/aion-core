@@ -12,6 +12,7 @@ import {
   ServiceActor,
   SystemActor,
 } from './actor.js';
+import { formatAgentUri } from './agent-identity.js';
 import { Mission } from './mission.js';
 import { Tool } from './tool.js';
 import { Workflow } from './workflow.js';
@@ -45,11 +46,23 @@ type AgentActorInput = Omit<
 > & { actorId?: string; agentId?: string };
 
 export function createAgentActor(input: AgentActorInput): AgentActor {
+  const agentId = input.agentId ?? newAgentId();
+  const domain = input.domain;
+  const role = input.role;
+  const agentUri =
+    input.agentUri ??
+    (domain && role
+      ? formatAgentUri({ domain, role, id: agentId })
+      : undefined);
+
   return AgentActor.parse({
     ...input,
     actorType: 'agent',
     actorId: input.actorId ?? newActorId(),
-    agentId: input.agentId ?? newAgentId(),
+    agentId,
+    domain,
+    role,
+    agentUri,
   });
 }
 

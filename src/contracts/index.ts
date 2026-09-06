@@ -6,6 +6,8 @@
  */
 export * from './identifiers.js';
 export * from './risk.js';
+export * from './autonomy.js';
+export * from './agent-identity.js';
 export * from './capability.js';
 export * from './actor.js';
 export * from './tool.js';
@@ -18,4 +20,5 @@ export * from './result.js';
 export * from './outcome.js';
 export * from './workflow.js';
 export * from './run.js';
+export * from './execution.js';
 export * from './telemetry.js';

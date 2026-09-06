@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { ActorId, AgentId, ToolId } from './identifiers.js';
 import { Capability } from './capability.js';
 import { RiskLevel } from './risk.js';
+import { AutonomyLevel } from './autonomy.js';
+import { AgentUri } from './agent-identity.js';
 
 /**
  * Actor model.
@@ -48,19 +50,43 @@ export const ActorBase = z.object({
  * Agent-specific governance fields (aion-docs/governance/agent-governance.md).
  * An agent is a governed worker, so it additionally declares its purpose, the
  * human/team accountable for it, its default risk level, escalation
- * conditions, and a cost budget.
+ * conditions, and a cost budget — plus the Week 1 identity / permission fields
+ * (canonical URI, domain/role, allowed data, I/O contracts, evals, autonomy).
  */
 export const AgentActor = ActorBase.extend({
   actorType: z.literal('agent'),
   agentId: AgentId,
+  /**
+   * Canonical attributable identity: `agent://aion/{domain}/{role}/{id}`.
+   * Prefer this over display names when assigning work or writing executions.
+   */
+  agentUri: AgentUri.optional(),
+  /** Domain this agent belongs to (revenue, media, infra, …). */
+  domain: z.string().min(1).optional(),
+  /** Role within the domain (pipeline-ops, script-writer, …). */
+  role: z.string().min(1).optional(),
+  /** Tenant / company scope for multi-venture isolation. */
+  tenantId: z.string().min(1).optional(),
   /** The one job this agent exists to do. */
   purpose: z.string().min(1),
   /** The human or team accountable for this agent. */
   owner: z.string().min(1),
   /** The agent's default risk level; a specific action may classify higher. */
   defaultRiskLevel: RiskLevel.default('R1'),
+  /** Declared autonomy ceiling; never raised by the worker itself. */
+  autonomyLevel: AutonomyLevel.default('L1'),
   /** Conditions under which the agent must stop and escalate to a human. */
   escalationConditions: z.array(z.string()).default([]),
+  /** Data scopes this agent may read/write — least privilege. */
+  allowedData: z.array(z.string()).default([]),
+  /** Shape of work this agent accepts (contract name or schema ref). */
+  inputContract: z.string().min(1).optional(),
+  /** Shape of results this agent returns (contract name or schema ref). */
+  outputContract: z.string().min(1).optional(),
+  /** How output quality is judged (eval ids / criteria). */
+  evaluationCriteria: z.array(z.string()).default([]),
+  /** What the agent must emit to remain traceable. */
+  observabilityRequirements: z.array(z.string()).default([]),
   /** Cost ceiling (abstract units) for a single unit of work. */
   costBudget: z.number().nonnegative().optional(),
 });
