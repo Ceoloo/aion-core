@@ -15,12 +15,16 @@ import {
   parseAgentUri,
   parseServiceKey,
   ExecutionObject,
+  MissionEconomicsRollup,
+  ScopeEconomicsRollup,
+  computeRoi,
   EVENT_TYPES,
   newRequestId,
   newCommandId,
   newRunId,
   newCorrelationId,
   newActorId,
+  newMissionId,
 } from '../../src/index.js';
 
 describe('contract validation', () => {
@@ -207,5 +211,44 @@ describe('contract validation', () => {
     const publish = catalog.find((s) => s.name === 'media.post.publish');
     expect(publish?.approvalRequired).toBe(true);
     expect(publish?.riskLevel).toBe('R2');
+  });
+
+  it('parses MissionEconomicsRollup and computes ROI / EV-to-cost', () => {
+    const now = new Date().toISOString();
+    const rollup = MissionEconomicsRollup.parse({
+      missionId: newMissionId(),
+      tenantId: 'aion-systems',
+      totalExecutions: 4,
+      successCount: 2,
+      failureCount: 1,
+      policyDenials: 1,
+      approvals: 1,
+      humanInterventions: 1,
+      totalCostUnits: 20,
+      totalDurationMs: 15,
+      outcomeCount: 1,
+      attributedEconomicValue: 100,
+      roi: computeRoi(100, 20),
+      computedAt: now,
+    });
+    expect(rollup.roi).toBe(5);
+    expect(computeRoi(50, 0)).toBeNull();
+
+    const scope = ScopeEconomicsRollup.parse({
+      scope: { tenantId: 'aion-systems', companyId: 'co_1' },
+      totalExecutions: 0,
+      successCount: 0,
+      failureCount: 0,
+      policyDenials: 0,
+      approvals: 0,
+      humanInterventions: 0,
+      totalCostUnits: 0,
+      totalDurationMs: 0,
+      outcomeCount: 0,
+      attributedEconomicValue: 0,
+      roi: null,
+      computedAt: now,
+    });
+    expect(scope.scope.tenantId).toBe('aion-systems');
   });
 });

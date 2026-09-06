@@ -22,6 +22,7 @@ export * from './outcome.js';
 export * from './workflow.js';
 export * from './run.js';
 export * from './execution.js';
+export * from './economics.js';
 export * from './service.js';
 export * from './service-catalog.js';
 export * from './telemetry.js';
