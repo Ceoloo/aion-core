@@ -7,11 +7,7 @@ import { ValidationError, NotFoundError } from '../errors/index.js';
 import type { Clock } from '../observability/clock.js';
 import type { WorkflowRepository } from '../ports/workflow-repository.js';
 import type { MissionRepository } from '../ports/mission-repository.js';
-import type {
-  Orchestrator} from './orchestrator.js';
-import {
-  type OrchestrationResult,
-} from './orchestrator.js';
+import type { Orchestrator, OrchestrationResult } from './orchestrator.js';
 
 /**
  * One step outcome inside a Mission orchestration.
