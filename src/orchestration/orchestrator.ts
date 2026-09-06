@@ -211,6 +211,18 @@ export class Orchestrator {
       ...(input.riskLevel ? { riskLevel: input.riskLevel } : {}),
       createdAt: this.clock.isoNow(),
       metadata: input.metadata ?? {},
+      ...(input.serviceKey ? { serviceKey: input.serviceKey } : {}),
+      ...(input.claimedAgentId ? { claimedAgentId: input.claimedAgentId } : {}),
+      ...(input.approvalId ? { approvalId: input.approvalId } : {}),
+      ...(input.executionId ? { executionId: input.executionId } : {}),
+      ...(input.parentExecutionId
+        ? { parentExecutionId: input.parentExecutionId }
+        : {}),
+      ...(input.rootExecutionId ? { rootExecutionId: input.rootExecutionId } : {}),
+      ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+      ...(input.resourceTenantId
+        ? { resourceTenantId: input.resourceTenantId }
+        : {}),
     };
     const parsed = Command.safeParse(draft);
     if (!parsed.success) {

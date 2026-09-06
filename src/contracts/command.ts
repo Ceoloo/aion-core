@@ -55,6 +55,10 @@ export const Command = z.object({
   approvalId: ApprovalId.optional(),
   /** Execution this command runs under (approval binding + lineage). */
   executionId: ExecutionId.optional(),
+  /** Parent execution in a Mission 004 orchestration tree. */
+  parentExecutionId: ExecutionId.optional(),
+  /** Root execution of the orchestration tree (self when root step). */
+  rootExecutionId: ExecutionId.optional(),
   /** Tenant scope for the request (defaults from actor/execution). */
   tenantId: z.string().min(1).optional(),
   /** Tenant of a targeted resource — cross-tenant reference is DENY. */
@@ -83,6 +87,8 @@ export interface CommandInput {
   claimedAgentId?: string;
   approvalId?: string;
   executionId?: string;
+  parentExecutionId?: string;
+  rootExecutionId?: string;
   tenantId?: string;
   resourceTenantId?: string;
 }
