@@ -9,15 +9,23 @@ import { newServiceId } from './identifiers.js';
 /**
  * Mission 001 (Revenue) Service Catalog v0 seed.
  *
- * Only these five services are registered until Mission 001 proves the
- * platform. Media services land in Mission 002 — not before.
+ * Lead/outreach services plus live-call Copilot engines. Media services land
+ * in Mission 002 — not before.
  */
 export const MISSION_001_SERVICE_KEYS = [
+  // Outbound / pipeline
   'revenue.lead.research@1',
   'revenue.lead.enrich@1',
   'revenue.lead.score@1',
   'revenue.outreach.generate@1',
   'revenue.followup.execute@1',
+  // Live-call Copilot engines (Week 3)
+  'revenue.context@1',
+  'revenue.extraction@1',
+  'revenue.conversationstate@1',
+  'revenue.signals@1',
+  'revenue.objection@1',
+  'revenue.nextaction@1',
 ] as const;
 
 export type Mission001ServiceKey = (typeof MISSION_001_SERVICE_KEYS)[number];
@@ -63,6 +71,48 @@ const MISSION_001_SPECS: ReadonlyArray<{
     description: 'Execute a follow-up step (may touch external channels).',
     riskLevel: 'R2',
     approvalRequired: true,
+  },
+  {
+    name: 'revenue.context',
+    version: 1,
+    description: 'Interpret live-call context for the Revenue Copilot.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'revenue.extraction',
+    version: 1,
+    description: 'Extract structured facts from a live sales turn.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'revenue.conversationstate',
+    version: 1,
+    description: 'Classify conversation stage / ladder position.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'revenue.signals',
+    version: 1,
+    description: 'Detect buying signals in a live conversation.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'revenue.objection',
+    version: 1,
+    description: 'Interpret objections and suggest handling.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'revenue.nextaction',
+    version: 1,
+    description: 'Recommend the next best revenue action for the rep.',
+    riskLevel: 'R1',
+    approvalRequired: false,
   },
 ];
 

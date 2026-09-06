@@ -153,7 +153,7 @@ describe('contract validation', () => {
 
   it('seeds Mission 001 Service Catalog v0 with versioned keys', () => {
     const catalog = buildMission001Catalog();
-    expect(catalog).toHaveLength(5);
+    expect(catalog).toHaveLength(11);
     expect(catalog.map((s) => s.serviceKey)).toEqual([
       'revenue.lead.research@1',
       'revenue.lead.enrich@1',
