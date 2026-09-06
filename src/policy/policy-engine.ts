@@ -167,7 +167,7 @@ export class PolicyEngine {
       const grantMeta = command.metadata?.['autonomyGrant'];
       const grant =
         grantMeta && typeof grantMeta === 'object'
-          ? (grantMeta as import('../contracts/autonomy-grant.js').AutonomyGrant)
+          ? (grantMeta as AutonomyGrant)
           : undefined;
       const autonomy = evaluateAutonomy({
         grant,
