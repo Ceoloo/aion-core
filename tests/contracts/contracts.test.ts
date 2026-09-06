@@ -10,6 +10,7 @@ import {
   createExecutionObject,
   createServiceDefinition,
   buildMission001Catalog,
+  buildMission002Catalog,
   formatAgentUri,
   parseAgentUri,
   parseServiceKey,
@@ -185,5 +186,26 @@ describe('contract validation', () => {
       name: 'revenue.lead.research',
       version: 1,
     });
+  });
+
+  it('seeds Mission 002 Media/G-Star catalog on the same ServiceDefinition contract', () => {
+    const catalog = buildMission002Catalog();
+    expect(catalog).toHaveLength(6);
+    expect(catalog.map((s) => s.serviceKey)).toEqual([
+      'media.trend.research@1',
+      'media.concept.generate@1',
+      'media.script.generate@1',
+      'media.asset.produce@1',
+      'media.post.publish@1',
+      'media.performance.ingest@1',
+    ]);
+    for (const svc of catalog) {
+      expect(svc.capability).toBe(svc.name);
+      expect(svc.owner).toBe('aion-systems/media');
+      expect(svc.metadata).toMatchObject({ mission: '002' });
+    }
+    const publish = catalog.find((s) => s.name === 'media.post.publish');
+    expect(publish?.approvalRequired).toBe(true);
+    expect(publish?.riskLevel).toBe('R2');
   });
 });
