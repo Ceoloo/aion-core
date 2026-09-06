@@ -1,5 +1,5 @@
 import type { Run } from '../contracts/run.js';
-import type { RunId } from '../contracts/identifiers.js';
+import type { RunId, RequestId } from '../contracts/identifiers.js';
 
 /**
  * RunRepository port.
@@ -11,6 +11,11 @@ import type { RunId } from '../contracts/identifiers.js';
  */
 export interface RunRepository {
   get(id: RunId): Promise<Run | undefined>;
+  /**
+   * Lookup by client `requestId` for submit idempotency. Returns the first
+   * matching run (oldest) when duplicates exist historically.
+   */
+  getByRequestId(requestId: RequestId | string): Promise<Run | undefined>;
   save(run: Run): Promise<void>;
   /** All runs, primarily for inspection/tests. */
   list(): Promise<Run[]>;
