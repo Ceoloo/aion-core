@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   AUTONOMY_PROMOTION_THRESHOLDS,
+  AuthorizationRequest,
   buildAutonomyEvidence,
   computeEligibleAutonomyLevel,
   createAutonomyGrant,
@@ -211,13 +212,15 @@ describe('Mission 008 earned autonomy', () => {
     });
 
     const allowed = engine.authorize(
-      {
+      AuthorizationRequest.parse({
         agentId: agent.agentId,
         tenantId: 'aion-systems',
+        environment: 'staging',
         action: 'execute',
         capability: capability('revenue.followup.execute'),
+        permissions: agent.permissions.map(String),
         riskLevel: 'R2',
-      },
+      }),
       { actor: agent, autonomyGrant: grant },
     );
     expect(allowed.decision).toBe('ALLOW');
@@ -226,13 +229,15 @@ describe('Mission 008 earned autonomy', () => {
     );
 
     const r3 = engine.authorize(
-      {
+      AuthorizationRequest.parse({
         agentId: agent.agentId,
         tenantId: 'aion-systems',
+        environment: 'staging',
         action: 'execute',
         capability: capability('revenue.followup.execute'),
+        permissions: agent.permissions.map(String),
         riskLevel: 'R3',
-      },
+      }),
       { actor: agent, autonomyGrant: grant },
     );
     expect(r3.decision).toBe('REQUIRE_APPROVAL');
