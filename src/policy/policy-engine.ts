@@ -14,6 +14,8 @@ import type { Actor, AgentActor } from '../contracts/actor.js';
 import type { AuthorizationRequest } from '../contracts/scope.js';
 import { tenantScopeAllows } from '../contracts/scope.js';
 import type { ApprovalRequest } from '../contracts/approval.js';
+import type { AutonomyGrant } from '../contracts/autonomy-grant.js';
+import { evaluateAutonomy } from '../contracts/autonomy-grant.js';
 
 export interface PolicyEngineConfig {
   /** Identifier recorded on every decision this engine produces. */
@@ -43,6 +45,14 @@ export interface AuthorizeContext {
   approval?: ApprovalRequest;
   /** Catalog service key Runtime resolved for this invocation. */
   resolvedServiceKey?: string;
+  /**
+   * Mission 008 — active AutonomyGrant for agent × service × tenant × env.
+   * Performance can waive R2 gates only when grant currentLevel is L4.
+   * Never waives R3.
+   */
+  autonomyGrant?: AutonomyGrant;
+  /** Mission 008 — force demotion for this decision (manual override). */
+  manualAutonomyDemote?: boolean;
   /** ISO timestamp override for deterministic tests. */
   now?: string;
 }
@@ -294,24 +304,40 @@ export class PolicyEngine {
         detail: binding.detail,
       });
       if (!binding.passed) {
-        // Missing approval on a gated action → REQUIRE_APPROVAL; bad binding → DENY.
+        // Missing approval on a gated action → try earned autonomy waiver (M008);
+        // bad binding → DENY.
         if (binding.missing) {
-          checks.push({
-            kind: 'approval-requirement',
-            passed: false,
-            detail: `risk ${riskLevel} requires a human gate`,
-          });
-          return {
-            decision: 'REQUIRE_APPROVAL',
-            reason: this.approvalReason(riskLevel, capability),
-            policyId: this.policyId,
+          const autonomy = evaluateAutonomy({
+            grant: ctx.autonomyGrant,
             riskLevel,
-            requiresApproval: true,
-            checks,
-            evaluatedAt: this.clock.isoNow(),
-          };
+            baselineRequiresApproval: true,
+            manualDemote: ctx.manualAutonomyDemote,
+          });
+          checks.push({
+            kind: 'autonomy-grant',
+            passed: autonomy.waivesApproval,
+            detail: autonomy.detail,
+          });
+          if (!autonomy.waivesApproval) {
+            checks.push({
+              kind: 'approval-requirement',
+              passed: false,
+              detail: `risk ${riskLevel} requires a human gate`,
+            });
+            return {
+              decision: 'REQUIRE_APPROVAL',
+              reason: this.approvalReason(riskLevel, capability),
+              policyId: this.policyId,
+              riskLevel,
+              requiresApproval: true,
+              checks,
+              evaluatedAt: this.clock.isoNow(),
+            };
+          }
+          // Earned L4 waiver — continue to budget / final checks without a human gate.
+        } else {
+          return this.deny(binding.detail, riskLevel, checks);
         }
-        return this.deny(binding.detail, riskLevel, checks);
       }
     } else {
       checks.push({
@@ -377,6 +403,8 @@ export class PolicyEngine {
         : `risk ${riskLevel} does not require a human gate`,
     });
     if (requiresApproval) {
+      const waived = this.tryAutonomyWaiver(riskLevel, capability, checks, ctx);
+      if (waived) return waived;
       return {
         decision: 'REQUIRE_APPROVAL',
         reason: this.approvalReason(riskLevel, capability),
@@ -391,6 +419,39 @@ export class PolicyEngine {
     return {
       decision: 'ALLOW',
       reason: `authorization passed at risk ${riskLevel}`,
+      policyId: this.policyId,
+      riskLevel,
+      requiresApproval: false,
+      checks,
+      evaluatedAt: this.clock.isoNow(),
+    };
+  }
+
+  /**
+   * Mission 008 — if an active L4 grant covers this risk, ALLOW without a
+   * human gate. R3 is never waived.
+   */
+  private tryAutonomyWaiver(
+    riskLevel: RiskLevel,
+    _capability: Capability,
+    checks: PolicyCheck[],
+    ctx: AuthorizeContext,
+  ): PolicyDecision | null {
+    const autonomy = evaluateAutonomy({
+      grant: ctx.autonomyGrant,
+      riskLevel,
+      baselineRequiresApproval: true,
+      manualDemote: ctx.manualAutonomyDemote,
+    });
+    checks.push({
+      kind: 'autonomy-grant',
+      passed: autonomy.waivesApproval,
+      detail: autonomy.detail,
+    });
+    if (!autonomy.waivesApproval) return null;
+    return {
+      decision: 'ALLOW',
+      reason: autonomy.reason,
       policyId: this.policyId,
       riskLevel,
       requiresApproval: false,

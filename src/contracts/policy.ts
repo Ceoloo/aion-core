@@ -30,6 +30,7 @@ export const POLICY_CHECK_KINDS = [
   'approval-binding',
   'budget',
   'approval-requirement',
+  'autonomy-grant',
 ] as const;
 export const PolicyCheckKind = z.enum(POLICY_CHECK_KINDS);
 export type PolicyCheckKind = z.infer<typeof PolicyCheckKind>;
