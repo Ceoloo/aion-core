@@ -41,12 +41,20 @@ export class ApprovalGate {
     command: Command,
     runId: RunId,
     decision: PolicyDecision,
+    binding: {
+      executionId?: ApprovalRequest['executionId'];
+      tenantId?: string;
+      expiresAt?: string;
+    } = {},
   ): Promise<ApprovalRequest> {
     const request: ApprovalRequest = {
       approvalId: newApprovalId(),
       runId,
       requestId: command.requestId,
       ...(command.missionId ? { missionId: command.missionId } : {}),
+      ...(binding.executionId ? { executionId: binding.executionId } : {}),
+      ...(binding.tenantId ? { tenantId: binding.tenantId } : {}),
+      ...(binding.expiresAt ? { expiresAt: binding.expiresAt } : {}),
       command,
       riskLevel: decision.riskLevel,
       reason: decision.reason,
@@ -55,6 +63,38 @@ export class ApprovalGate {
     };
     await this.store.save(request);
     return request;
+  }
+
+  /**
+   * Mark a granted approval as consumed after a successful gated execute.
+   * Replay of a consumed approvalId is DENY (Mission 003).
+   */
+  async consume(approvalId: ApprovalId): Promise<ApprovalRequest> {
+    const existing = await this.store.get(approvalId);
+    if (!existing) {
+      throw new NotFoundError(
+        `approval request "${approvalId}" not found`,
+        { approvalId },
+      );
+    }
+    if (existing.status !== 'granted') {
+      throw new InvalidStateTransitionError(
+        `approval "${approvalId}" must be granted before consume (is ${existing.status})`,
+        { approvalId, status: existing.status },
+      );
+    }
+    if (existing.consumedAt) {
+      throw new InvalidStateTransitionError(
+        `approval "${approvalId}" already consumed`,
+        { approvalId, consumedAt: existing.consumedAt },
+      );
+    }
+    const updated: ApprovalRequest = {
+      ...existing,
+      consumedAt: this.clock.isoNow(),
+    };
+    await this.store.save(updated);
+    return updated;
   }
 
   async get(id: ApprovalId): Promise<ApprovalRequest | undefined> {

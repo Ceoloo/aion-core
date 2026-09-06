@@ -10,6 +10,7 @@ export * from './autonomy.js';
 export * from './agent-identity.js';
 export * from './capability.js';
 export * from './actor.js';
+export * from './scope.js';
 export * from './tool.js';
 export * from './mission.js';
 export * from './command.js';

@@ -22,9 +22,13 @@ export type PolicyDecisionKind = z.infer<typeof PolicyDecisionKind>;
 
 /** The kinds of check the policy engine performs, in evaluation order. */
 export const POLICY_CHECK_KINDS = [
+  'tenant-scope',
+  'identity',
   'permission',
   'tool',
   'risk-allowance',
+  'approval-binding',
+  'budget',
   'approval-requirement',
 ] as const;
 export const PolicyCheckKind = z.enum(POLICY_CHECK_KINDS);

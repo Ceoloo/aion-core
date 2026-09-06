@@ -92,6 +92,16 @@ export const ExecutionObject = z.object({
   agentUri: AgentUri.optional(),
   tenantId: z.string().min(1).optional(),
   domain: z.string().min(1).optional(),
+  /** Optional company within the tenant (Mission 003 scope). */
+  companyId: z.string().min(1).optional(),
+  /** Optional venture within the company. */
+  ventureId: z.string().min(1).optional(),
+  /** Optional project within the venture. */
+  projectId: z.string().min(1).optional(),
+  /** Immediate parent execution (worker spawned by an orchestrator). */
+  parentExecutionId: ExecutionId.optional(),
+  /** Root of the execution tree (defaults to self at create). */
+  rootExecutionId: ExecutionId.optional(),
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   runId: RunId,
@@ -156,6 +166,11 @@ export interface CreateExecutionObjectInput {
   result?: ExecutionResult;
   executionId?: ExecutionId;
   tenantId?: string;
+  companyId?: string;
+  ventureId?: string;
+  projectId?: string;
+  parentExecutionId?: ExecutionId;
+  rootExecutionId?: ExecutionId;
   autonomyLevel?: AutonomyLevel;
   auditTrace?: ExecutionAuditEntry[];
   outcomeId?: OutcomeId;
@@ -186,12 +201,19 @@ export function createExecutionObject(
       }
     : { units: 0 };
 
+  const executionId = input.executionId ?? newExecutionId();
   return ExecutionObject.parse({
-    executionId: input.executionId ?? newExecutionId(),
+    executionId,
     actorId: run.actorId,
     agentUri: agent?.agentUri,
     tenantId: input.tenantId ?? agent?.tenantId,
     domain: agent?.domain,
+    companyId: input.companyId ?? agent?.companyId,
+    ventureId: input.ventureId ?? agent?.ventureId,
+    projectId: input.projectId ?? agent?.projectId,
+    parentExecutionId: input.parentExecutionId,
+    rootExecutionId:
+      input.rootExecutionId ?? input.parentExecutionId ?? executionId,
     runId: run.runId,
     requestId: run.requestId,
     commandId: run.commandId,

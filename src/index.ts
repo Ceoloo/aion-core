@@ -34,6 +34,7 @@ export type {
 export {
   PolicyEngine,
   type PolicyEngineConfig,
+  type AuthorizeContext,
 } from './policy/policy-engine.js';
 export {
   PermissionEvaluator,
