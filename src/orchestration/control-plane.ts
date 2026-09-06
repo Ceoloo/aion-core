@@ -9,11 +9,13 @@ import { systemClock } from '../observability/clock.js';
 
 import { InMemoryRunRepository } from '../adapters/in-memory-run-repository.js';
 import { InMemoryMissionRepository } from '../adapters/in-memory-mission-repository.js';
+import { InMemoryWorkflowRepository } from '../adapters/in-memory-workflow-repository.js';
 import { InMemoryEventSink } from '../events/in-memory-event-sink.js';
 import { InMemoryApprovalStore } from '../approvals/in-memory-approval-store.js';
 import { InMemoryTelemetrySink } from '../observability/in-memory-telemetry-sink.js';
 
 import { Orchestrator } from './orchestrator.js';
+import { MissionOrchestrator } from './mission-orchestrator.js';
 
 export interface ControlPlaneConfig {
   policy?: PolicyEngineConfig;
@@ -29,11 +31,13 @@ export interface ControlPlaneConfig {
  */
 export interface ControlPlane {
   orchestrator: Orchestrator;
+  missionOrchestrator: MissionOrchestrator;
   policyEngine: PolicyEngine;
   registry: ExecutionRegistry;
   approvalGate: ApprovalGate;
   runRepository: InMemoryRunRepository;
   missionRepository: InMemoryMissionRepository;
+  workflowRepository: InMemoryWorkflowRepository;
   eventSink: InMemoryEventSink;
   telemetrySink: InMemoryTelemetrySink;
   approvalStore: InMemoryApprovalStore;
@@ -54,6 +58,7 @@ export function createInMemoryControlPlane(
   const telemetrySink = new InMemoryTelemetrySink();
   const runRepository = new InMemoryRunRepository();
   const missionRepository = new InMemoryMissionRepository();
+  const workflowRepository = new InMemoryWorkflowRepository();
   const approvalStore = new InMemoryApprovalStore();
 
   const events = new EventEmitter(eventSink, clock);
@@ -76,13 +81,22 @@ export function createInMemoryControlPlane(
     clock,
   });
 
+  const missionOrchestrator = new MissionOrchestrator({
+    orchestrator,
+    missions: missionRepository,
+    workflows: workflowRepository,
+    clock,
+  });
+
   return {
     orchestrator,
+    missionOrchestrator,
     policyEngine,
     registry,
     approvalGate,
     runRepository,
     missionRepository,
+    workflowRepository,
     eventSink,
     telemetrySink,
     approvalStore,

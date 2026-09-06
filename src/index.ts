@@ -24,6 +24,7 @@ export * from './errors/index.js';
 // ── Ports (persistence/observability seams) ─────────────────────────────────
 export type {
   MissionRepository,
+  WorkflowRepository,
   RunRepository,
   EventSink,
   ApprovalStore,
@@ -84,6 +85,7 @@ export {
 // ── In-memory persistence adapters ──────────────────────────────────────────
 export { InMemoryRunRepository } from './adapters/in-memory-run-repository.js';
 export { InMemoryMissionRepository } from './adapters/in-memory-mission-repository.js';
+export { InMemoryWorkflowRepository } from './adapters/in-memory-workflow-repository.js';
 
 // ── Orchestration kernel ────────────────────────────────────────────────────
 export {
@@ -91,6 +93,14 @@ export {
   type OrchestratorDeps,
   type OrchestrationResult,
 } from './orchestration/orchestrator.js';
+export {
+  MissionOrchestrator,
+  type MissionOrchestratorDeps,
+  type MissionRunInput,
+  type MissionOrchestrationResult,
+  type MissionStepResult,
+  type MissionOrchestrationStatus,
+} from './orchestration/mission-orchestrator.js';
 export {
   type RunContext,
   createRunContext,
