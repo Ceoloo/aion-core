@@ -15,7 +15,8 @@ import {
 import { RiskLevel } from './risk.js';
 import { AutonomyLevel } from './autonomy.js';
 import { AgentUri } from './agent-identity.js';
-import { ExecutionCost, ExecutionResult } from './result.js';
+import { ExecutionCost } from './result.js';
+import type { ExecutionResult } from './result.js';
 import type { Run } from './run.js';
 import type { AgentActor } from './actor.js';
 
