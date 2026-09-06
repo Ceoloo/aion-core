@@ -163,6 +163,34 @@ export class PolicyEngine {
         : `risk ${riskLevel} does not require a human gate`,
     });
     if (requiresApproval) {
+      // Mission 008 — Runtime may attach AutonomyGrant on command.metadata.
+      const grantMeta = command.metadata?.['autonomyGrant'];
+      const grant =
+        grantMeta && typeof grantMeta === 'object'
+          ? (grantMeta as import('../contracts/autonomy-grant.js').AutonomyGrant)
+          : undefined;
+      const autonomy = evaluateAutonomy({
+        grant,
+        riskLevel,
+        baselineRequiresApproval: true,
+        manualDemote: command.metadata?.['manualAutonomyDemote'] === true,
+      });
+      checks.push({
+        kind: 'autonomy-grant',
+        passed: autonomy.waivesApproval,
+        detail: autonomy.detail,
+      });
+      if (autonomy.waivesApproval) {
+        return {
+          decision: 'ALLOW',
+          reason: autonomy.reason,
+          policyId: this.policyId,
+          riskLevel,
+          requiresApproval: false,
+          checks,
+          evaluatedAt: this.clock.isoNow(),
+        };
+      }
       return {
         decision: 'REQUIRE_APPROVAL',
         reason: this.approvalReason(riskLevel, command.capability),
