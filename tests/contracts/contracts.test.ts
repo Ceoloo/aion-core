@@ -8,8 +8,11 @@ import {
   createMission,
   createTool,
   createExecutionObject,
+  createServiceDefinition,
+  buildMission001Catalog,
   formatAgentUri,
   parseAgentUri,
+  parseServiceKey,
   ExecutionObject,
   EVENT_TYPES,
   newRequestId,
@@ -146,5 +149,35 @@ describe('contract validation', () => {
     // actorId brand is preserved through the factory.
     expect(exe.actorId).toBe(agent.actorId);
     expect(exe.actorId).not.toBe(newActorId());
+  });
+
+  it('seeds Mission 001 Service Catalog v0 with versioned keys', () => {
+    const catalog = buildMission001Catalog();
+    expect(catalog).toHaveLength(5);
+    expect(catalog.map((s) => s.serviceKey)).toEqual([
+      'revenue.lead.research@1',
+      'revenue.lead.enrich@1',
+      'revenue.lead.score@1',
+      'revenue.outreach.generate@1',
+      'revenue.followup.execute@1',
+    ]);
+    for (const svc of catalog) {
+      expect(svc.capability).toBe(svc.name);
+      expect(svc.serviceId).toMatch(/^svc_/);
+      expect(svc.status).toBe('active');
+    }
+    const followup = catalog.find((s) => s.name === 'revenue.followup.execute');
+    expect(followup?.approvalRequired).toBe(true);
+    expect(followup?.riskLevel).toBe('R2');
+
+    const viaFactory = createServiceDefinition({
+      serviceKey: 'revenue.lead.research@1',
+      owner: 'aion-systems/revenue',
+    });
+    expect(viaFactory.capability).toBe('revenue.lead.research');
+    expect(parseServiceKey(viaFactory.serviceKey)).toEqual({
+      name: 'revenue.lead.research',
+      version: 1,
+    });
   });
 });

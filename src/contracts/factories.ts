@@ -5,6 +5,7 @@ import {
   newToolId,
   newMissionId,
   newWorkflowId,
+  newServiceId,
 } from './identifiers.js';
 import {
   HumanActor,
@@ -13,9 +14,15 @@ import {
   SystemActor,
 } from './actor.js';
 import { formatAgentUri } from './agent-identity.js';
+import { capability } from './capability.js';
 import { Mission } from './mission.js';
 import { Tool } from './tool.js';
 import { Workflow } from './workflow.js';
+import {
+  ServiceDefinition,
+  formatServiceKey,
+  parseServiceKey,
+} from './service.js';
 import type { Clock } from '../observability/clock.js';
 import { systemClock } from '../observability/clock.js';
 
@@ -125,5 +132,45 @@ export function createWorkflow(input: WorkflowInput): Workflow {
   return Workflow.parse({
     ...input,
     workflowId: input.workflowId ?? newWorkflowId(),
+  });
+}
+
+type ServiceInput = Omit<
+  z.input<typeof ServiceDefinition>,
+  'serviceId' | 'serviceKey' | 'capability' | 'name' | 'version'
+> & {
+  serviceId?: string;
+  /** Full key `name@version`, OR pass name+version separately. */
+  serviceKey?: string;
+  name?: string;
+  version?: number;
+  capability?: string;
+};
+
+/**
+ * Create a Service Catalog entry. Prefer `serviceKey` (`revenue.lead.research@1`);
+ * capability defaults to the unversioned name.
+ */
+export function createServiceDefinition(input: ServiceInput): ServiceDefinition {
+  let name = input.name;
+  let version = input.version;
+  if (input.serviceKey) {
+    const parts = parseServiceKey(input.serviceKey);
+    name = name ?? parts.name;
+    version = version ?? parts.version;
+  }
+  if (!name || version === undefined) {
+    throw new Error('createServiceDefinition requires serviceKey or name+version');
+  }
+  const serviceKey = formatServiceKey(name, version);
+  const cap = capability(input.capability ?? name);
+  return ServiceDefinition.parse({
+    ...input,
+    serviceId: input.serviceId ?? newServiceId(),
+    serviceKey,
+    name,
+    version,
+    capability: cap,
+    requiredPermissions: input.requiredPermissions ?? [cap],
   });
 }

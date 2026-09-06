@@ -30,6 +30,7 @@ export const ID_KIND = {
   OutcomeId: 'out',
   CorrelationId: 'cor',
   ExecutionId: 'exe',
+  ServiceId: 'svc',
 } as const;
 
 export type IdKind = keyof typeof ID_KIND;
@@ -80,6 +81,9 @@ export type CorrelationId = z.infer<typeof CorrelationId>;
 export const ExecutionId = idSchema('ExecutionId');
 export type ExecutionId = z.infer<typeof ExecutionId>;
 
+export const ServiceId = idSchema('ServiceId');
+export type ServiceId = z.infer<typeof ServiceId>;
+
 /**
  * Maps an ID kind to its branded runtime type. Used by {@link generateId} so a
  * single generator can mint any kind while preserving the brand.
@@ -98,6 +102,7 @@ export interface IdTypeMap {
   OutcomeId: OutcomeId;
   CorrelationId: CorrelationId;
   ExecutionId: ExecutionId;
+  ServiceId: ServiceId;
 }
 
 /**
@@ -132,3 +137,4 @@ export const newEventId = (): EventId => generateId('EventId');
 export const newOutcomeId = (): OutcomeId => generateId('OutcomeId');
 export const newCorrelationId = (): CorrelationId => generateId('CorrelationId');
 export const newExecutionId = (): ExecutionId => generateId('ExecutionId');
+export const newServiceId = (): ServiceId => generateId('ServiceId');
