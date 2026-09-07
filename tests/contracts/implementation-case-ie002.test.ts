@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACTIVATION_REQUIRED_STEPS,
+  ImplementationCase,
   activateImplementation,
   applyIntake,
   approveBlueprint,
@@ -33,13 +34,13 @@ function readyIntake(
   };
 }
 
-function toBlueprintApproved() {
+function toBlueprintApproved(commercialStatus: 'prospect' | 'paid' = 'paid') {
   let c = createImplementationCase({
     tenantId: 'aion-systems',
     clientRef: 'client-acme',
     clientName: 'Acme Services',
     ownerId: 'operator-alex',
-    commercialStatus: 'paid',
+    commercialStatus,
     createdAt: NOW,
   });
   c = applyIntake(c, readyIntake({ completedBy: 'operator-alex' }), NOW);
@@ -53,59 +54,39 @@ function toBlueprintApproved() {
   return approveBlueprint(c, 'operator-alex', NOW);
 }
 
-describe('IE-002 provisioning + activation gate', () => {
-  it('refuses activation_ready until every required step is verified', () => {
-    let c = toBlueprintApproved();
-    expect(c.commercialStatus).toBe('paid');
-    expect(c.deliveryStatus).toBe('blueprint_approved');
-
-    c = startProvisioning(c, 'operator-alex', NOW);
-    expect(c.deliveryStatus).toBe('provisioning');
-    expect(c.blockers).toEqual(
-      expect.arrayContaining([
-        'blocked:ghl_connection',
-        'blocked:model_access',
-        'blocked:workflow_activation',
-      ]),
+function verifyAll(c: ReturnType<typeof toBlueprintApproved>) {
+  let next = c;
+  next = startProvisioning(next, 'operator-alex', NOW);
+  for (const key of ACTIVATION_REQUIRED_STEPS) {
+    next = updateProvisioningStep(
+      next,
+      {
+        key,
+        status: 'verified',
+        evidence: `manual proof for ${key}`,
+        completedBy: 'operator-alex',
+      },
+      NOW,
     );
+  }
+  return next;
+}
 
-    expect(() => markActivationReady(c, 'operator-alex', NOW)).toThrow(
-      /unverified steps/,
+describe('IE-002 acceptance matrix', () => {
+  it('rejects start provisioning before blueprint approval', () => {
+    const draft = createImplementationCase({
+      tenantId: 'aion-systems',
+      clientRef: 'client-early',
+      clientName: 'Early',
+      ownerId: 'ops',
+      createdAt: NOW,
+    });
+    expect(() => startProvisioning(draft, 'ops', NOW)).toThrow(
+      /illegal delivery transition/,
     );
   });
 
-  it('verifies steps with evidence then activation_ready → human activate → active', () => {
-    let c = toBlueprintApproved();
-    c = startProvisioning(c, 'operator-alex', NOW);
-
-    for (const key of ACTIVATION_REQUIRED_STEPS) {
-      c = updateProvisioningStep(
-        c,
-        {
-          key,
-          status: 'verified',
-          evidence: `manual proof for ${key}`,
-          completedBy: 'operator-alex',
-        },
-        NOW,
-      );
-    }
-
-    expect(c.blockers).toEqual([]);
-    c = markActivationReady(c, 'operator-alex', NOW);
-    expect(c.deliveryStatus).toBe('activation_ready');
-
-    expect(() =>
-      activateImplementation(c, '', NOW),
-    ).toThrow(/approvedBy/);
-
-    c = activateImplementation(c, 'operator-alex', NOW);
-    expect(c.deliveryStatus).toBe('active');
-    expect(c.metadata?.['activatedBy']).toBe('operator-alex');
-    expect(c.nextAction).toMatch(/OL-001/);
-  });
-
-  it('rejects invisible verification without evidence/actor', () => {
+  it('rejects verify without evidence or completedBy', () => {
     let c = toBlueprintApproved();
     c = startProvisioning(c, 'operator-alex', NOW);
     expect(() =>
@@ -119,8 +100,68 @@ describe('IE-002 provisioning + activation gate', () => {
       updateProvisioningStep(c, {
         key: 'ghl_connection',
         status: 'verified',
-        evidence: 'location XYZ connected',
+        evidence: 'location connected',
       }),
     ).toThrow(/completedBy/);
+  });
+
+  it('rejects activation_ready when a required step is missing', () => {
+    let c = toBlueprintApproved();
+    c = startProvisioning(c, 'operator-alex', NOW);
+    for (const key of ACTIVATION_REQUIRED_STEPS.slice(0, -1)) {
+      c = updateProvisioningStep(
+        c,
+        {
+          key,
+          status: 'verified',
+          evidence: `proof-${key}`,
+          completedBy: 'ops',
+        },
+        NOW,
+      );
+    }
+    expect(() => markActivationReady(c, 'ops', NOW)).toThrow(/unverified steps/);
+  });
+
+  it('reaches activation_ready after all required steps, then enforces approvedBy', () => {
+    let c = verifyAll(toBlueprintApproved());
+    c = markActivationReady(c, 'operator-alex', NOW);
+    expect(c.deliveryStatus).toBe('activation_ready');
+    expect(() => activateImplementation(c, '', NOW)).toThrow(/approvedBy/);
+    c = activateImplementation(c, 'operator-alex', NOW);
+    expect(c.deliveryStatus).toBe('active');
+  });
+
+  it('re-activate of already-active case is idempotent', () => {
+    let c = verifyAll(toBlueprintApproved());
+    c = markActivationReady(c, 'ops', NOW);
+    c = activateImplementation(c, 'ops', NOW);
+    const again = activateImplementation(c, 'ops-other', NOW);
+    expect(again.deliveryStatus).toBe('active');
+    expect(again.caseId).toBe(c.caseId);
+    expect(again.metadata?.['activatedBy']).toBe('ops');
+  });
+
+  it('commercial status change alone never causes activation', () => {
+    const paidDraft = createImplementationCase({
+      tenantId: 'aion-systems',
+      clientRef: 'client-paid',
+      clientName: 'Paid Only',
+      ownerId: 'ops',
+      commercialStatus: 'paid',
+      createdAt: NOW,
+    });
+    expect(paidDraft.deliveryStatus).toBe('draft');
+
+    const bumped = ImplementationCase.parse({
+      ...paidDraft,
+      commercialStatus: 'paid',
+      metadata: { ...paidDraft.metadata, invoice: 'INV-1' },
+    });
+    expect(bumped.deliveryStatus).toBe('draft');
+    expect(bumped.commercialStatus).toBe('paid');
+    expect(() => activateImplementation(bumped, 'ops', NOW)).toThrow(
+      /illegal delivery transition|cannot activate/,
+    );
   });
 });

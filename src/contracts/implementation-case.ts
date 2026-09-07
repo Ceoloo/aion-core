@@ -905,6 +905,7 @@ export function markActivationReady(
 
 /**
  * IE-002 — human activation gate. Generator/checklist never auto-activates.
+ * Re-activating an already-active case is idempotent (same record returned).
  */
 export function activateImplementation(
   caseRecord: ImplementationCase,
@@ -913,6 +914,9 @@ export function activateImplementation(
 ): ImplementationCase {
   if (!approvedBy.trim()) {
     throw new Error('activate requires approvedBy (human gate)');
+  }
+  if (caseRecord.deliveryStatus === 'active') {
+    return caseRecord;
   }
   assertDeliveryTransition(caseRecord.deliveryStatus, 'active');
   if (caseRecord.deliveryStatus !== 'activation_ready') {
