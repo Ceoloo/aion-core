@@ -229,3 +229,127 @@ export function buildMission002Catalog(): ServiceDefinitionType[] {
     }),
   );
 }
+
+/**
+ * Mission 009 — live CRM / GoHighLevel client-money plane (commercially
+ * meaningful workflow; payment movement explicitly out of MVP).
+ *
+ * Agents never call GHL directly — Runtime adapters invoke these services
+ * under identity, tenant, permission, risk, autonomy, approval, and budget.
+ */
+export const MISSION_009_SERVICE_KEYS = [
+  'crm.contact.read@1',
+  'crm.contact.enrich@1',
+  'crm.contact.update@1',
+  'crm.opportunity.read@1',
+  'crm.opportunity.create@1',
+  'crm.opportunity.update@1',
+  'crm.note.create@1',
+  'crm.task.create@1',
+  'crm.message.draft@1',
+  'crm.message.send@1',
+] as const;
+
+export type Mission009ServiceKey = (typeof MISSION_009_SERVICE_KEYS)[number];
+
+const MISSION_009_SPECS: ReadonlyArray<{
+  name: string;
+  version: number;
+  description: string;
+  riskLevel: 'R0' | 'R1' | 'R2' | 'R3';
+  approvalRequired: boolean;
+}> = [
+  {
+    name: 'crm.contact.read',
+    version: 1,
+    description: 'Read a contact from the tenant CRM workspace (GHL).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.contact.enrich',
+    version: 1,
+    description: 'Enrich a CRM contact with research attributes (reversible write).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.contact.update',
+    version: 1,
+    description: 'Update permitted CRM contact fields in the tenant workspace.',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.opportunity.read',
+    version: 1,
+    description: 'Read an opportunity / pipeline record from the tenant CRM.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.opportunity.create',
+    version: 1,
+    description: 'Create an opportunity in the tenant CRM (idempotent).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.opportunity.update',
+    version: 1,
+    description: 'Update an opportunity in the tenant CRM.',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.note.create',
+    version: 1,
+    description: 'Create a CRM note on a contact / opportunity.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.task.create',
+    version: 1,
+    description: 'Create a CRM task in the tenant workspace.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.message.draft',
+    version: 1,
+    description: 'Draft a customer-facing follow-up message (no send).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.message.send',
+    version: 1,
+    description: 'Send a customer-facing message via CRM (always gated; R3).',
+    riskLevel: 'R3',
+    approvalRequired: true,
+  },
+];
+
+/** Build Mission 009 CRM ServiceDefinition records. */
+export function buildMission009Catalog(): ServiceDefinitionType[] {
+  return MISSION_009_SPECS.map((spec) =>
+    ServiceDefinition.parse({
+      serviceId: newServiceId(),
+      serviceKey: formatServiceKey(spec.name, spec.version),
+      name: spec.name,
+      version: spec.version,
+      capability: capability(spec.name),
+      owner: 'aion-systems/revenue',
+      description: spec.description,
+      requiredPermissions: [capability(spec.name)],
+      agentCompatibility: ['agent://aion/revenue/', 'revenue', 'agent://aion/crm/', 'crm'],
+      riskLevel: spec.riskLevel,
+      approvalRequired: spec.approvalRequired,
+      evalRefs: [`eval.${spec.name}@1`],
+      consumers: ['mission-009', 'revenue-copilot', 'ghl-client-plane'],
+      status: 'active',
+      metadata: { mission: '009', catalog: 'v0', provider: 'ghl' },
+    }),
+  );
+}
