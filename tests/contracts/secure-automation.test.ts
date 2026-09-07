@@ -8,6 +8,7 @@ import {
   SECURE_AUTOMATION_STANDARD_VERSION,
   applyIntake,
   attachBlueprintDraft,
+  buildMission009Catalog,
   buildSecureAutomationAppointmentCatalog,
   createImplementationCase,
   draftBlueprintFromCase,
@@ -93,17 +94,22 @@ describe('SA-STD-001 Secure Automation', () => {
     expect(c.blueprint?.secureAutomation?.standardVersion).toBe('1.0.0');
   });
 
-  it('keeps appointment catalog stubs inactive', () => {
+  it('keeps appointment write catalog stubs inactive; read is active in M009', () => {
     const stubs = buildSecureAutomationAppointmentCatalog();
-    expect(stubs).toHaveLength(3);
+    expect(stubs).toHaveLength(2);
     expect(stubs.every((s) => s.status === 'inactive')).toBe(true);
     expect(stubs.map((s) => s.name)).toEqual(
       expect.arrayContaining([
-        'crm.appointment.read',
         'crm.appointment.create',
         'crm.appointment.update',
       ]),
     );
+    const m009 = buildMission009Catalog();
+    expect(m009.some((s) => s.name === 'crm.appointment.read' && s.status === 'active')).toBe(
+      true,
+    );
+    expect(m009.some((s) => s.name === 'crm.pipeline.read')).toBe(true);
+    expect(m009.some((s) => s.name === 'crm.contact.search')).toBe(true);
   });
 
   it('maps OL verification and lists production blockers with claim caveats', () => {
