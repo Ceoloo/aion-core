@@ -26,6 +26,7 @@ export * from './economics.js';
 export * from './evaluation.js';
 export * from './autonomy-grant.js';
 export * from './external-side-effect.js';
+export * from './implementation-case.js';
 export * from './service.js';
 export * from './service-catalog.js';
 export * from './telemetry.js';
