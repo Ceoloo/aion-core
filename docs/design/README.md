@@ -16,6 +16,7 @@ ports, staying kernel-only and vendor-agnostic."
 |---|---|---|---|
 | [execution-gateway.md](execution-gateway.md) | [ADR-003](https://github.com/Ceoloo/aion-docs/blob/main/adr/ADR-003-execution-gateway-and-evidence.md) — idempotency, replay safety, execution receipts | P0 | Design |
 | [programmatic-execution-and-a2a.md](programmatic-execution-and-a2a.md) | Runtime-control brief signals 2 & 5 — CodeAct/PTC plans; A2A mapping | P1 / P2 | Design |
+| [crm-tool-ghl.md](crm-tool-ghl.md) | GoHighLevel as a governed, side-effecting CRM tool (gateway + risk + idempotency) | per-mission | Design |
 
 ## Ground rules for every spec here
 
