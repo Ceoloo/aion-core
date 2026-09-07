@@ -250,6 +250,16 @@ export const MISSION_009_SERVICE_KEYS = [
   'crm.message.send@1',
 ] as const;
 
+/**
+ * Reserved Lead-to-Appointment calendar services (inactive until AIO-17).
+ * Not part of the operable L2A v1 path — human books appointments today.
+ */
+export const SECURE_AUTOMATION_APPOINTMENT_SERVICE_KEYS = [
+  'crm.appointment.read@1',
+  'crm.appointment.create@1',
+  'crm.appointment.update@1',
+] as const;
+
 export type Mission009ServiceKey = (typeof MISSION_009_SERVICE_KEYS)[number];
 
 const MISSION_009_SPECS: ReadonlyArray<{
@@ -350,6 +360,71 @@ export function buildMission009Catalog(): ServiceDefinitionType[] {
       consumers: ['mission-009', 'revenue-copilot', 'ghl-client-plane'],
       status: 'active',
       metadata: { mission: '009', catalog: 'v0', provider: 'ghl' },
+    }),
+  );
+}
+
+const APPOINTMENT_SPECS: ReadonlyArray<{
+  name: string;
+  version: number;
+  description: string;
+  riskLevel: 'R0' | 'R1' | 'R2' | 'R3';
+  approvalRequired: boolean;
+}> = [
+  {
+    name: 'crm.appointment.read',
+    version: 1,
+    description:
+      'Read calendar appointments from the tenant CRM (reserved; inactive until AIO-17).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.appointment.create',
+    version: 1,
+    description:
+      'Create a CRM calendar appointment (reserved; inactive until AIO-17).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.appointment.update',
+    version: 1,
+    description:
+      'Update a CRM calendar appointment (reserved; inactive until AIO-17).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+];
+
+/**
+ * Inactive appointment catalog stubs for Secure Automation L2A roadmap.
+ * Do not seed as active; do not wire adapters until AIO-17 certification.
+ */
+export function buildSecureAutomationAppointmentCatalog(): ServiceDefinitionType[] {
+  return APPOINTMENT_SPECS.map((spec) =>
+    ServiceDefinition.parse({
+      serviceId: newServiceId(),
+      serviceKey: formatServiceKey(spec.name, spec.version),
+      name: spec.name,
+      version: spec.version,
+      capability: capability(spec.name),
+      owner: 'aion-systems/revenue',
+      description: spec.description,
+      requiredPermissions: [capability(spec.name)],
+      agentCompatibility: ['agent://aion/revenue/', 'revenue', 'agent://aion/crm/', 'crm'],
+      riskLevel: spec.riskLevel,
+      approvalRequired: spec.approvalRequired,
+      evalRefs: [`eval.${spec.name}@1`],
+      consumers: ['secure-automation-l2a', 'mission-009'],
+      status: 'inactive',
+      metadata: {
+        mission: '009',
+        catalog: 'v0',
+        provider: 'ghl',
+        standard: 'SA-STD-001',
+        reservedFor: 'AIO-17',
+      },
     }),
   );
 }

@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import {
+  blueprintOverlayFromWorkflow,
+  defaultWorkflowForPackage,
+  SecureAutomationProfile,
+} from './secure-automation.js';
 
 /**
  * IE-001/IE-002 — Implementation Engine.
@@ -10,6 +15,9 @@ import { z } from 'zod';
  *
  * IE-001: create case → intake → package recommendation → approve blueprint.
  * IE-002: provisioning readiness → activation_ready → human approval → active.
+ *
+ * Secure Automation (SA-STD-001): versioned deployment profile applied to
+ * Revenue OS blueprints as Lead-to-Appointment v1 by default.
  */
 
 /** Branded implementation case id (`icase_…`). */
@@ -310,6 +318,8 @@ export const SolutionBlueprint = z.object({
   approvedAt: z.string().datetime().optional(),
   approvedBy: z.string().optional(),
   changeRequiresRenewedApproval: z.boolean().default(true),
+  /** Present when blueprint follows Secure Automation Deployment Standard. */
+  secureAutomation: SecureAutomationProfile.optional(),
 });
 export type SolutionBlueprint = z.infer<typeof SolutionBlueprint>;
 
@@ -537,6 +547,35 @@ export function draftBlueprintFromCase(
   const intake = input.caseRecord.intake;
   const pkg = input.packageKey;
   const label = PACKAGE_LABELS[pkg];
+  const saWorkflow = defaultWorkflowForPackage(pkg);
+  const saOverlay = saWorkflow
+    ? blueprintOverlayFromWorkflow(saWorkflow)
+    : undefined;
+
+  const defaultFirstWorkflow =
+    pkg === 'revenue_os'
+      ? {
+          name: 'Revenue follow-up loop',
+          inputs: ['qualified_lead_or_request', 'tenant_context'],
+          outputs: ['recorded_action', 'exception_or_handoff', 'cost_units'],
+        }
+      : pkg === 'client_ops_os'
+        ? {
+            name: 'Client intake + handoff loop',
+            inputs: ['qualified_lead_or_request', 'tenant_context'],
+            outputs: ['recorded_action', 'exception_or_handoff', 'cost_units'],
+          }
+        : pkg === 'ai_workforce_setup'
+          ? {
+              name: 'Owner admin relief loop',
+              inputs: ['qualified_lead_or_request', 'tenant_context'],
+              outputs: ['recorded_action', 'exception_or_handoff', 'cost_units'],
+            }
+          : {
+              name: 'Booking → delivery → review loop',
+              inputs: ['qualified_lead_or_request', 'tenant_context'],
+              outputs: ['recorded_action', 'exception_or_handoff', 'cost_units'],
+            };
 
   const base: SolutionBlueprint = SolutionBlueprint.parse({
     version: (input.caseRecord.blueprint?.version ?? 0) + 1,
@@ -550,18 +589,7 @@ export function draftBlueprintFromCase(
         : ['Baseline metric missing']),
     ],
     targetState: `Operate ${label} with one approved live workflow and weekly reporting`,
-    firstWorkflow: {
-      name:
-        pkg === 'revenue_os'
-          ? 'Revenue follow-up loop'
-          : pkg === 'client_ops_os'
-            ? 'Client intake + handoff loop'
-            : pkg === 'ai_workforce_setup'
-              ? 'Owner admin relief loop'
-              : 'Booking → delivery → review loop',
-      inputs: ['qualified_lead_or_request', 'tenant_context'],
-      outputs: ['recorded_action', 'exception_or_handoff', 'cost_units'],
-    },
+    firstWorkflow: saOverlay?.firstWorkflow ?? defaultFirstWorkflow,
     integrationMappings: [
       {
         system: 'GoHighLevel',
@@ -574,25 +602,33 @@ export function draftBlueprintFromCase(
         dataOwner: input.caseRecord.tenantId,
       },
     ],
-    allowedActions: [
+    allowedActions: saOverlay?.allowedActions ?? [
       'create_implementation_records',
       'run_approved_workflow_steps',
       'request_human_approval',
     ],
-    prohibitedActions: [
+    prohibitedActions: saOverlay?.prohibitedActions ?? [
       'autonomous_customer_messaging',
       'automatic_workflow_activation_without_acceptance',
       'commercial_expansion_triggers_without_human_review',
     ],
-    humanApprovalPoints: [
+    humanApprovalPoints: saOverlay?.humanApprovalPoints ?? [
       'package_recommendation_review',
       'blueprint_approval',
       'workflow_activation',
     ],
-    baselineKpi: intake?.baselineMetric ?? 'TBD — record dated baseline before go-live',
-    targetKpi: 'First approved live workflow with recorded outcome + cost',
-    measurementSource: intake?.baselineSource ?? 'Operator Console + Runtime economics',
-    acceptanceTests: [
+    baselineKpi:
+      intake?.baselineMetric ??
+      saOverlay?.baselineKpi ??
+      'TBD — record dated baseline before go-live',
+    targetKpi:
+      saOverlay?.targetKpi ??
+      'First approved live workflow with recorded outcome + cost',
+    measurementSource:
+      intake?.baselineSource ??
+      saOverlay?.measurementSource ??
+      'Operator Console + Runtime economics',
+    acceptanceTests: saOverlay?.acceptanceTests ?? [
       'Tenant isolation deny without x-aion-tenant-id',
       'Prohibited action blocked by policy',
       'Failure path preserves completed provisioning evidence',
@@ -610,6 +646,7 @@ export function draftBlueprintFromCase(
     createdAt: now,
     updatedAt: now,
     changeRequiresRenewedApproval: true,
+    secureAutomation: saOverlay?.secureAutomation,
   });
 
   if (!input.overrides) return base;

@@ -23,7 +23,8 @@ export const ServiceKey = z
   .regex(SERVICE_KEY_PATTERN, 'serviceKey must be name@version, e.g. revenue.lead.research@1');
 export type ServiceKey = z.infer<typeof ServiceKey>;
 
-export const SERVICE_STATUSES = ['active', 'deprecated'] as const;
+/** `inactive` = reserved / not operable (e.g. Secure Automation appointment stubs). */
+export const SERVICE_STATUSES = ['active', 'inactive', 'deprecated'] as const;
 export const ServiceStatus = z.enum(SERVICE_STATUSES);
 export type ServiceStatus = z.infer<typeof ServiceStatus>;
 
