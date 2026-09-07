@@ -7,6 +7,7 @@
  * of any concrete database, broker, or observability vendor.
  */
 export type { MissionRepository } from './mission-repository.js';
+export type { WorkflowRepository } from './workflow-repository.js';
 export type { RunRepository } from './run-repository.js';
 export type { EventSink } from './event-sink.js';
 export type { ApprovalStore } from './approval-store.js';

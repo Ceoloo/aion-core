@@ -7,9 +7,24 @@ import {
   createAgentActor,
   createMission,
   createTool,
+  createExecutionObject,
+  createServiceDefinition,
+  buildMission001Catalog,
+  buildMission002Catalog,
+  formatAgentUri,
+  parseAgentUri,
+  parseServiceKey,
+  ExecutionObject,
+  MissionEconomicsRollup,
+  ScopeEconomicsRollup,
+  computeRoi,
   EVENT_TYPES,
   newRequestId,
   newCommandId,
+  newRunId,
+  newCorrelationId,
+  newActorId,
+  newMissionId,
 } from '../../src/index.js';
 
 describe('contract validation', () => {
@@ -82,5 +97,158 @@ describe('contract validation', () => {
       riskLevel: 'R1',
     });
     expect(tool.toolId).toMatch(/^tool_/);
+  });
+
+  it('mints canonical agent://aion/{domain}/{role}/{id} identity fields', () => {
+    const agent = createAgentActor({
+      name: 'Pipeline Ops',
+      purpose: 'qualify leads',
+      owner: 'revenue',
+      domain: 'revenue',
+      role: 'pipeline-ops',
+      permissions: [capability('research.summary')],
+      allowedData: ['crm.leads.read'],
+      autonomyLevel: 'L2',
+      evaluationCriteria: ['revenue.lead.qualify@1'],
+      observabilityRequirements: ['telemetry.cost', 'events.lifecycle'],
+    });
+    expect(agent.agentUri).toBe(
+      formatAgentUri({
+        domain: 'revenue',
+        role: 'pipeline-ops',
+        id: agent.agentId,
+      }),
+    );
+    expect(parseAgentUri(agent.agentUri!).domain).toBe('revenue');
+    expect(agent.allowedData).toEqual(['crm.leads.read']);
+    expect(agent.autonomyLevel).toBe('L2');
+  });
+
+  it('builds a canonical Execution Object from a run + agent', () => {
+    const agent = createAgentActor({
+      name: 'A',
+      purpose: 'p',
+      owner: 'o',
+      domain: 'revenue',
+      role: 'copilot',
+      tenantId: 'aion-systems',
+    });
+    const now = new Date().toISOString();
+    const run = {
+      runId: newRunId(),
+      requestId: newRequestId(),
+      commandId: newCommandId(),
+      actorId: agent.actorId,
+      state: 'completed' as const,
+      riskLevel: 'R1' as const,
+      correlationId: newCorrelationId(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    const exe = createExecutionObject({ run, agent });
+    expect(exe.executionId).toMatch(/^exe_/);
+    expect(exe.agentUri).toBe(agent.agentUri);
+    expect(exe.status).toBe('succeeded');
+    expect(exe.tenantId).toBe('aion-systems');
+    expect(ExecutionObject.parse(exe).auditTrace.length).toBeGreaterThan(0);
+    // actorId brand is preserved through the factory.
+    expect(exe.actorId).toBe(agent.actorId);
+    expect(exe.actorId).not.toBe(newActorId());
+  });
+
+  it('seeds Mission 001 Service Catalog v0 with versioned keys', () => {
+    const catalog = buildMission001Catalog();
+    expect(catalog).toHaveLength(11);
+    expect(catalog.map((s) => s.serviceKey)).toEqual([
+      'revenue.lead.research@1',
+      'revenue.lead.enrich@1',
+      'revenue.lead.score@1',
+      'revenue.outreach.generate@1',
+      'revenue.followup.execute@1',
+      'revenue.context@1',
+      'revenue.extraction@1',
+      'revenue.conversationstate@1',
+      'revenue.signals@1',
+      'revenue.objection@1',
+      'revenue.nextaction@1',
+    ]);
+    for (const svc of catalog) {
+      expect(svc.capability).toBe(svc.name);
+      expect(svc.serviceId).toMatch(/^svc_/);
+      expect(svc.status).toBe('active');
+    }
+    const followup = catalog.find((s) => s.name === 'revenue.followup.execute');
+    expect(followup?.approvalRequired).toBe(true);
+    expect(followup?.riskLevel).toBe('R2');
+
+    const viaFactory = createServiceDefinition({
+      serviceKey: 'revenue.lead.research@1',
+      owner: 'aion-systems/revenue',
+    });
+    expect(viaFactory.capability).toBe('revenue.lead.research');
+    expect(parseServiceKey(viaFactory.serviceKey)).toEqual({
+      name: 'revenue.lead.research',
+      version: 1,
+    });
+  });
+
+  it('seeds Mission 002 Media/G-Star catalog on the same ServiceDefinition contract', () => {
+    const catalog = buildMission002Catalog();
+    expect(catalog).toHaveLength(6);
+    expect(catalog.map((s) => s.serviceKey)).toEqual([
+      'media.trend.research@1',
+      'media.concept.generate@1',
+      'media.script.generate@1',
+      'media.asset.produce@1',
+      'media.post.publish@1',
+      'media.performance.ingest@1',
+    ]);
+    for (const svc of catalog) {
+      expect(svc.capability).toBe(svc.name);
+      expect(svc.owner).toBe('aion-systems/media');
+      expect(svc.metadata).toMatchObject({ mission: '002' });
+    }
+    const publish = catalog.find((s) => s.name === 'media.post.publish');
+    expect(publish?.approvalRequired).toBe(true);
+    expect(publish?.riskLevel).toBe('R2');
+  });
+
+  it('parses MissionEconomicsRollup and computes ROI / EV-to-cost', () => {
+    const now = new Date().toISOString();
+    const rollup = MissionEconomicsRollup.parse({
+      missionId: newMissionId(),
+      tenantId: 'aion-systems',
+      totalExecutions: 4,
+      successCount: 2,
+      failureCount: 1,
+      policyDenials: 1,
+      approvals: 1,
+      humanInterventions: 1,
+      totalCostUnits: 20,
+      totalDurationMs: 15,
+      outcomeCount: 1,
+      attributedEconomicValue: 100,
+      roi: computeRoi(100, 20),
+      computedAt: now,
+    });
+    expect(rollup.roi).toBe(5);
+    expect(computeRoi(50, 0)).toBeNull();
+
+    const scope = ScopeEconomicsRollup.parse({
+      scope: { tenantId: 'aion-systems', companyId: 'co_1' },
+      totalExecutions: 0,
+      successCount: 0,
+      failureCount: 0,
+      policyDenials: 0,
+      approvals: 0,
+      humanInterventions: 0,
+      totalCostUnits: 0,
+      totalDurationMs: 0,
+      outcomeCount: 0,
+      attributedEconomicValue: 0,
+      roi: null,
+      computedAt: now,
+    });
+    expect(scope.scope.tenantId).toBe('aion-systems');
   });
 });

@@ -5,6 +5,8 @@ import {
   MissionId,
   WorkflowId,
   ToolId,
+  ApprovalId,
+  ExecutionId,
 } from './identifiers.js';
 import { Capability } from './capability.js';
 import { Actor } from './actor.js';
@@ -45,6 +47,22 @@ export const Command = z.object({
   riskLevel: RiskLevel.optional(),
   createdAt: z.string().datetime(),
   metadata: z.record(z.unknown()).default({}),
+  /** Catalog service key when invoking a shared capability (Mission 002+). */
+  serviceKey: z.string().min(1).optional(),
+  /** Agent-supplied identity claim; Runtime compares to authenticated actor. */
+  claimedAgentId: z.string().min(1).optional(),
+  /** Required for R2+ execute when policy returned REQUIRE_APPROVAL. */
+  approvalId: ApprovalId.optional(),
+  /** Execution this command runs under (approval binding + lineage). */
+  executionId: ExecutionId.optional(),
+  /** Parent execution in a Mission 004 orchestration tree. */
+  parentExecutionId: ExecutionId.optional(),
+  /** Root execution of the orchestration tree (self when root step). */
+  rootExecutionId: ExecutionId.optional(),
+  /** Tenant scope for the request (defaults from actor/execution). */
+  tenantId: z.string().min(1).optional(),
+  /** Tenant of a targeted resource — cross-tenant reference is DENY. */
+  resourceTenantId: z.string().min(1).optional(),
 });
 export type Command = z.infer<typeof Command>;
 
@@ -65,4 +83,12 @@ export interface CommandInput {
   payload?: Record<string, unknown>;
   riskLevel?: RiskLevel;
   metadata?: Record<string, unknown>;
+  serviceKey?: string;
+  claimedAgentId?: string;
+  approvalId?: string;
+  executionId?: string;
+  parentExecutionId?: string;
+  rootExecutionId?: string;
+  tenantId?: string;
+  resourceTenantId?: string;
 }
