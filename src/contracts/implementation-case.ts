@@ -2,14 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 /**
- * IE-001 — Implementation Engine (first slice).
+ * IE-001/IE-002 — Implementation Engine.
  *
  * Coordinates CRM, tenant setup, execution platform, and delivery process.
  * This is NOT a second runtime. Qualification is rule-based + human review;
  * model access must not block intake or package selection.
  *
- * First engineering slice: create case → intake → package recommendation →
- * edit/approve blueprint. Provisioning / GHL / model steps stay visibly blocked.
+ * IE-001: create case → intake → package recommendation → approve blueprint.
+ * IE-002: provisioning readiness → activation_ready → human approval → active.
  */
 
 /** Branded implementation case id (`icase_…`). */
@@ -38,6 +38,9 @@ export type CommercialStatus = z.infer<typeof CommercialStatus>;
 /**
  * Delivery / technical readiness for the ImplementationCase.
  * A signed or paid client is NOT automatically activation-ready.
+ *
+ * IE-002 renames the post-provisioning gate to `activation_ready` → `active`
+ * (replacing the IE-001 stubs `accepted` / `live`, which remain for compat).
  */
 export const DELIVERY_STATUSES = [
   'draft',
@@ -46,7 +49,11 @@ export const DELIVERY_STATUSES = [
   'blueprint_draft',
   'blueprint_approved',
   'provisioning',
+  'activation_ready',
+  'active',
+  /** @deprecated IE-001 stub — prefer activation_ready */
   'accepted',
+  /** @deprecated IE-001 stub — prefer active */
   'live',
   'on_hold',
   'declined',
@@ -54,7 +61,7 @@ export const DELIVERY_STATUSES = [
 export const DeliveryStatus = z.enum(DELIVERY_STATUSES);
 export type DeliveryStatus = z.infer<typeof DeliveryStatus>;
 
-/** Legal delivery status transitions for the first IE-001 slice (+ later stubs). */
+/** Legal delivery status transitions (IE-001 + IE-002 activation gate). */
 export const IMPLEMENTATION_DELIVERY_TRANSITIONS: Record<
   DeliveryStatus,
   readonly DeliveryStatus[]
@@ -64,9 +71,11 @@ export const IMPLEMENTATION_DELIVERY_TRANSITIONS: Record<
   recommendation_ready: ['blueprint_draft', 'on_hold', 'declined'],
   blueprint_draft: ['blueprint_approved', 'recommendation_ready', 'on_hold', 'declined'],
   blueprint_approved: ['provisioning', 'on_hold', 'declined'],
-  provisioning: ['accepted', 'on_hold', 'declined'],
-  accepted: ['live', 'on_hold'],
-  live: ['on_hold'],
+  provisioning: ['activation_ready', 'on_hold', 'declined'],
+  activation_ready: ['active', 'provisioning', 'on_hold', 'declined'],
+  active: ['on_hold'],
+  accepted: ['activation_ready', 'live', 'active', 'on_hold'],
+  live: ['active', 'on_hold'],
   on_hold: [
     'draft',
     'intake_complete',
@@ -74,6 +83,8 @@ export const IMPLEMENTATION_DELIVERY_TRANSITIONS: Record<
     'blueprint_draft',
     'blueprint_approved',
     'provisioning',
+    'activation_ready',
+    'accepted',
     'declined',
   ],
   declined: [],
@@ -168,6 +179,39 @@ export const PROVISIONING_STEP_STATUSES = [
 ] as const;
 export const ProvisioningStepStatus = z.enum(PROVISIONING_STEP_STATUSES);
 export type ProvisioningStepStatus = z.infer<typeof ProvisioningStepStatus>;
+
+/** Steps that must be verified before activation_ready (IE-002). */
+export const ACTIVATION_REQUIRED_STEPS: readonly ProvisioningStepKey[] = [
+  'agreement_payment',
+  'workspace_tenant',
+  'ghl_connection',
+  'model_access',
+  'data_sources',
+  'permissions',
+  'baseline',
+  'workflow_activation',
+] as const;
+
+/** Legal step status transitions — retry must not invent duplicate resources. */
+export const PROVISIONING_STEP_TRANSITIONS: Record<
+  ProvisioningStepStatus,
+  readonly ProvisioningStepStatus[]
+> = {
+  pending: ['running', 'blocked', 'verified', 'failed'],
+  running: ['verified', 'failed', 'blocked', 'pending'],
+  blocked: ['pending', 'running', 'verified', 'failed'],
+  failed: ['pending', 'running', 'blocked'],
+  /** Re-open for recovery only — never create a second tenant/workspace/workflow. */
+  verified: ['pending', 'blocked'],
+};
+
+export function canTransitionProvisioningStep(
+  from: ProvisioningStepStatus,
+  to: ProvisioningStepStatus,
+): boolean {
+  if (from === to) return true;
+  return PROVISIONING_STEP_TRANSITIONS[from].includes(to);
+}
 
 export const EvidenceLink = z.object({
   label: z.string().min(1),
@@ -671,10 +715,237 @@ export function approveBlueprint(
     },
     deliveryStatus: 'blueprint_approved',
     nextAction:
-      'Begin provisioning checklist (GHL + model access remain blocked until verified)',
+      'Start provisioning — verify GHL, model access, and remaining readiness steps before activation',
     blockers: (caseRecord.blockers ?? []).filter(
       (b) => !b.startsWith('missing:') && b !== 'discovery_required',
     ),
+    updatedAt: now,
+  });
+}
+
+function ensureProvisioningChecklist(
+  caseRecord: ImplementationCase,
+  now: string,
+): ProvisioningChecklist {
+  if (caseRecord.provisioning?.steps?.length) {
+    return caseRecord.provisioning;
+  }
+  return defaultProvisioningChecklist(now);
+}
+
+function syncProvisioningBlockers(
+  steps: ProvisioningStep[],
+): string[] {
+  return steps
+    .filter((s) => s.status === 'blocked' || s.status === 'failed')
+    .map((s) =>
+      s.status === 'failed'
+        ? `failed:${s.key}`
+        : `blocked:${s.key}`,
+    );
+}
+
+/**
+ * IE-002 — enter provisioning after blueprint approval.
+ * Blocked steps remain blocked until explicitly verified with evidence.
+ */
+export function startProvisioning(
+  caseRecord: ImplementationCase,
+  startedBy: string,
+  now: string = new Date().toISOString(),
+): ImplementationCase {
+  assertDeliveryTransition(caseRecord.deliveryStatus, 'provisioning');
+  if (caseRecord.blueprint?.status !== 'approved') {
+    throw new Error('cannot start provisioning — blueprint not approved');
+  }
+  const provisioning = ensureProvisioningChecklist(caseRecord, now);
+  return ImplementationCase.parse({
+    ...caseRecord,
+    deliveryStatus: 'provisioning',
+    provisioning: {
+      ...provisioning,
+      updatedAt: now,
+    },
+    nextAction:
+      'Verify provisioning steps with evidence (GHL + model access are activation gates)',
+    blockers: syncProvisioningBlockers(provisioning.steps),
+    metadata: {
+      ...caseRecord.metadata,
+      provisioningStartedBy: startedBy,
+      provisioningStartedAt: now,
+    },
+    updatedAt: now,
+  });
+}
+
+export interface UpdateProvisioningStepInput {
+  key: ProvisioningStepKey;
+  status: ProvisioningStepStatus;
+  evidence?: string;
+  completedBy?: string;
+  blockReason?: string;
+}
+
+/**
+ * IE-002 — update one provisioning step. Idempotent on same status.
+ * Verified steps require evidence + completedBy (no invisible manual work).
+ */
+export function updateProvisioningStep(
+  caseRecord: ImplementationCase,
+  input: UpdateProvisioningStepInput,
+  now: string = new Date().toISOString(),
+): ImplementationCase {
+  if (caseRecord.deliveryStatus !== 'provisioning') {
+    throw new Error(
+      `cannot update provisioning step from deliveryStatus=${caseRecord.deliveryStatus} — start provisioning first`,
+    );
+  }
+
+  const provisioning = ensureProvisioningChecklist(caseRecord, now);
+  const idx = provisioning.steps.findIndex((s) => s.key === input.key);
+  if (idx < 0) {
+    throw new Error(`unknown provisioning step ${input.key}`);
+  }
+  const current = provisioning.steps[idx]!;
+  if (!canTransitionProvisioningStep(current.status, input.status)) {
+    throw new Error(
+      `illegal provisioning step transition ${current.key}: ${current.status} → ${input.status}`,
+    );
+  }
+  if (input.status === 'verified') {
+    if (!input.evidence?.trim()) {
+      throw new Error(`verified step ${input.key} requires evidence`);
+    }
+    if (!input.completedBy?.trim()) {
+      throw new Error(`verified step ${input.key} requires completedBy`);
+    }
+  }
+
+  const nextStep: ProvisioningStep = {
+    ...current,
+    status: input.status,
+    updatedAt: now,
+    ...(input.evidence !== undefined ? { evidence: input.evidence } : {}),
+    ...(input.completedBy !== undefined
+      ? { completedBy: input.completedBy }
+      : {}),
+    ...(input.status === 'blocked'
+      ? {
+          blockReason:
+            input.blockReason?.trim() ||
+            current.blockReason ||
+            'blocked pending verification',
+        }
+      : input.status === 'verified'
+        ? { blockReason: undefined }
+        : input.blockReason !== undefined
+          ? { blockReason: input.blockReason }
+          : {}),
+  };
+
+  const steps = provisioning.steps.map((s, i) => (i === idx ? nextStep : s));
+  const blockers = syncProvisioningBlockers(steps);
+  const unverified = ACTIVATION_REQUIRED_STEPS.filter((key) => {
+    const step = steps.find((s) => s.key === key);
+    return !step || step.status !== 'verified';
+  });
+
+  return ImplementationCase.parse({
+    ...caseRecord,
+    deliveryStatus: 'provisioning',
+    provisioning: { steps, updatedAt: now },
+    blockers,
+    nextAction:
+      unverified.length === 0
+        ? 'All required steps verified — mark activation ready'
+        : `Verify remaining steps: ${unverified.join(', ')}`,
+    updatedAt: now,
+  });
+}
+
+export function listUnverifiedActivationSteps(
+  caseRecord: ImplementationCase,
+): ProvisioningStepKey[] {
+  const steps = caseRecord.provisioning?.steps ?? [];
+  return ACTIVATION_REQUIRED_STEPS.filter((key) => {
+    const step = steps.find((s) => s.key === key);
+    return !step || step.status !== 'verified';
+  });
+}
+
+/**
+ * IE-002 — all required steps verified → activation_ready (not yet live).
+ */
+export function markActivationReady(
+  caseRecord: ImplementationCase,
+  markedBy: string,
+  now: string = new Date().toISOString(),
+): ImplementationCase {
+  assertDeliveryTransition(caseRecord.deliveryStatus, 'activation_ready');
+  const missing = listUnverifiedActivationSteps(caseRecord);
+  if (missing.length > 0) {
+    throw new Error(
+      `cannot mark activation ready — unverified steps: ${missing.join(', ')}`,
+    );
+  }
+  return ImplementationCase.parse({
+    ...caseRecord,
+    deliveryStatus: 'activation_ready',
+    blockers: [],
+    nextAction:
+      'Human approval required to activate — then feed first live workflow (OL-001 Mission 001)',
+    metadata: {
+      ...caseRecord.metadata,
+      activationReadyBy: markedBy,
+      activationReadyAt: now,
+    },
+    updatedAt: now,
+  });
+}
+
+/**
+ * IE-002 — human activation gate. Generator/checklist never auto-activates.
+ */
+export function activateImplementation(
+  caseRecord: ImplementationCase,
+  approvedBy: string,
+  now: string = new Date().toISOString(),
+): ImplementationCase {
+  if (!approvedBy.trim()) {
+    throw new Error('activate requires approvedBy (human gate)');
+  }
+  assertDeliveryTransition(caseRecord.deliveryStatus, 'active');
+  if (caseRecord.deliveryStatus !== 'activation_ready') {
+    throw new Error(
+      `cannot activate from deliveryStatus=${caseRecord.deliveryStatus} — mark activation_ready first`,
+    );
+  }
+  const missing = listUnverifiedActivationSteps(caseRecord);
+  if (missing.length > 0) {
+    throw new Error(
+      `cannot activate — unverified steps: ${missing.join(', ')}`,
+    );
+  }
+  return ImplementationCase.parse({
+    ...caseRecord,
+    deliveryStatus: 'active',
+    blockers: [],
+    nextAction:
+      'Active — launch first approved live workflow (OL-001 Mission 001 feeder)',
+    metadata: {
+      ...caseRecord.metadata,
+      activatedBy: approvedBy,
+      activatedAt: now,
+    },
+    evidenceLinks: [
+      ...(caseRecord.evidenceLinks ?? []),
+      {
+        label: 'activation_approval',
+        note: `Activated by ${approvedBy}`,
+        recordedAt: now,
+        recordedBy: approvedBy,
+      },
+    ],
     updatedAt: now,
   });
 }
