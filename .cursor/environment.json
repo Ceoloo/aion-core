@@ -1,4 +1,6 @@
 {
-  "name": "aion-core",
-  "install": "npm ci"
+  "name": "aion-platform",
+  "install": "bash /agent/repos/aion-core/.cursor/install.sh",
+  "start": "bash /agent/repos/aion-core/.cursor/start.sh",
+  "ports": [8080]
 }
