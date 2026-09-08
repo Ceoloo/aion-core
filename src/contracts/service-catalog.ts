@@ -238,6 +238,7 @@ export function buildMission002Catalog(): ServiceDefinitionType[] {
  * under identity, tenant, permission, risk, autonomy, approval, and budget.
  */
 export const MISSION_009_SERVICE_KEYS = [
+  'crm.location.read@1',
   'crm.contact.read@1',
   'crm.contact.search@1',
   'crm.contact.enrich@1',
@@ -283,6 +284,13 @@ const MISSION_009_SPECS: ReadonlyArray<{
   riskLevel: 'R0' | 'R1' | 'R2' | 'R3';
   approvalRequired: boolean;
 }> = [
+  {
+    name: 'crm.location.read',
+    version: 1,
+    description: 'Read the bound GHL location / sub-account (read-only).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
   {
     name: 'crm.contact.read',
     version: 1,
