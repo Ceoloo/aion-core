@@ -25,6 +25,13 @@ describe('identifiers', () => {
     expect(() => RunId.parse('')).toThrow();
   });
 
+  it('rejects unprefixed and cross-kind ids at parse time', () => {
+    expect(() => RunId.parse('not-a-run-id')).toThrow();
+    expect(() => RunId.parse('msn_wrong-kind')).toThrow();
+    expect(() => RunId.parse('run')).toThrow();
+    expect(RunId.safeParse('run_ok').success).toBe(true);
+  });
+
   it('exposes a default generator matching generateId', () => {
     expect(defaultIdGenerator.generate('CommandId')).toMatch(/^cmd_/);
   });

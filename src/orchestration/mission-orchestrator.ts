@@ -160,7 +160,9 @@ export class MissionOrchestrator {
             ? input.actor.tenantId
             : undefined,
         requestId: input.requestIdPrefix
-          ? (`${input.requestIdPrefix}:step:${i}` as never)
+          ? (`req_${input.requestIdPrefix}:step:${i}` as ReturnType<
+              typeof newRequestId
+            >)
           : newRequestId(),
         payload,
         metadata: {

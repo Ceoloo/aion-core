@@ -37,10 +37,19 @@ export const ID_KIND = {
 
 export type IdKind = keyof typeof ID_KIND;
 
+/**
+ * Branded ID schemas require the canonical prefix for their kind (`run_…`,
+ * `msn_…`, …). Generation already mints prefixed IDs; parse-time enforcement
+ * stops cross-kind / unprefixed strings from entering the control plane.
+ */
 function idSchema<K extends IdKind>(kind: K) {
+  const prefix = `${ID_KIND[kind]}_`;
   return z
     .string()
-    .min(1)
+    .min(prefix.length + 1)
+    .refine((value) => value.startsWith(prefix), {
+      message: `${kind} must start with "${prefix}"`,
+    })
     .brand(kind);
 }
 
