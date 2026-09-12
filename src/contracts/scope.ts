@@ -74,6 +74,8 @@ export const AuthorizationRequest = z.object({
   action: z.string().min(1),
   resourceTenantId: z.string().min(1).optional(),
   resourceRefs: z.array(z.string()).default([]),
+  /** Data classes touched by this request (matched against AgentActor.allowedData). */
+  resourceDataClasses: z.array(z.string()).default([]),
   approvalId: z.string().min(1).optional(),
   /** Bound execution this approval was issued for (replay / cross-bind defense). */
   approvalExecutionId: ExecutionId.optional(),

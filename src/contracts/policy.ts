@@ -25,6 +25,7 @@ export const POLICY_CHECK_KINDS = [
   'tenant-scope',
   'identity',
   'permission',
+  'data-scope',
   'tool',
   'risk-allowance',
   'approval-binding',

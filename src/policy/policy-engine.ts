@@ -292,6 +292,24 @@ export class PolicyEngine {
       return this.deny(perm.reason, riskLevel, checks);
     }
 
+    // 3a. Data scope — agent may only touch declared allowedData classes.
+    if (actor.actorType === 'agent') {
+      const agent = actor as AgentActor;
+      const requested = request.resourceDataClasses ?? [];
+      if (requested.length > 0) {
+        const allowed = new Set(agent.allowedData.map(String));
+        const missing = requested.filter((c) => !allowed.has(String(c)));
+        const passed = missing.length === 0;
+        const detail = passed
+          ? `data scope ok (${requested.join(', ')})`
+          : `data scope denied: missing allowedData for [${missing.join(', ')}] (actor allows [${agent.allowedData.join(', ') || '∅'}])`;
+        checks.push({ kind: 'data-scope', passed, detail });
+        if (!passed) {
+          return this.deny(detail, riskLevel, checks);
+        }
+      }
+    }
+
     // 3b. serviceKey tampering — claimed key must match Runtime-resolved key.
     if (
       request.serviceKey &&
