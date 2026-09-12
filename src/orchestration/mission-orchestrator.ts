@@ -8,6 +8,7 @@ import type { Clock } from '../observability/clock.js';
 import type { WorkflowRepository } from '../ports/workflow-repository.js';
 import type { MissionRepository } from '../ports/mission-repository.js';
 import type { Orchestrator, OrchestrationResult } from './orchestrator.js';
+import { resolveOpportunityCapability } from './opportunity-entity-routing.js';
 
 /**
  * One step outcome inside a Mission orchestration.
@@ -140,11 +141,14 @@ export class MissionOrchestrator {
       const parentForStep =
         i === 0 && startIndex === 0 ? undefined : currentRootChildParent;
       const payload = resolveStepPayload(input.stepPayloads, i, step.name);
+      const capability = resolveOpportunityCapability(step.capability, payload);
+      const effectiveStep =
+        capability === step.capability ? step : { ...step, capability };
 
       const orchestration = await this.deps.orchestrator.submit({
         name: `${workflow.name}.${step.name}`,
         actor: input.actor,
-        capability: step.capability,
+        capability,
         riskLevel: step.riskLevel,
         missionId: mission.missionId,
         workflowId: workflow.workflowId,
@@ -173,7 +177,7 @@ export class MissionOrchestrator {
 
       const stepResult: MissionStepResult = {
         stepIndex: i,
-        step,
+        step: effectiveStep,
         status: orchestration.status,
         executionId,
         ...(parentForStep ? { parentExecutionId: parentForStep } : {}),
