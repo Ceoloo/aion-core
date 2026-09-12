@@ -102,6 +102,10 @@ export {
   type MissionOrchestrationStatus,
 } from './orchestration/mission-orchestrator.js';
 export {
+  resolveOpportunityCapability,
+  existingOpportunityId,
+} from './orchestration/opportunity-entity-routing.js';
+export {
   type RunContext,
   createRunContext,
   restoreRunContext,
