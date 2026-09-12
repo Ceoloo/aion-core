@@ -26,7 +26,13 @@ export const ExternalSideEffectStatus = z.enum(EXTERNAL_SIDE_EFFECT_STATUSES);
 export type ExternalSideEffectStatus = z.infer<typeof ExternalSideEffectStatus>;
 
 /** Branded side-effect id (`ese_…`). */
-export const ExternalSideEffectId = z.string().min(1).brand('ExternalSideEffectId');
+export const ExternalSideEffectId = z
+  .string()
+  .min(5)
+  .refine((value) => value.startsWith('ese_'), {
+    message: 'ExternalSideEffectId must start with "ese_"',
+  })
+  .brand('ExternalSideEffectId');
 export type ExternalSideEffectId = z.infer<typeof ExternalSideEffectId>;
 
 export function newExternalSideEffectId(): ExternalSideEffectId {

@@ -30,7 +30,13 @@ export const AutonomyGrantStatus = z.enum(AUTONOMY_GRANT_STATUSES);
 export type AutonomyGrantStatus = z.infer<typeof AutonomyGrantStatus>;
 
 /** Branded grant id (`agr_…`). */
-export const AutonomyGrantId = z.string().min(1).brand('AutonomyGrantId');
+export const AutonomyGrantId = z
+  .string()
+  .min(5)
+  .refine((value) => value.startsWith('agr_'), {
+    message: 'AutonomyGrantId must start with "agr_"',
+  })
+  .brand('AutonomyGrantId');
 export type AutonomyGrantId = z.infer<typeof AutonomyGrantId>;
 
 export function newAutonomyGrantId(): AutonomyGrantId {
