@@ -29,3 +29,4 @@ export * from './external-side-effect.js';
 export * from './service.js';
 export * from './service-catalog.js';
 export * from './telemetry.js';
+export * from './agent-handoff.js';
