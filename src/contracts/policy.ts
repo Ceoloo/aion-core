@@ -26,6 +26,7 @@ export const POLICY_CHECK_KINDS = [
   'identity',
   'permission',
   'data-scope',
+  'action-tier',
   'tool',
   'risk-allowance',
   'approval-binding',

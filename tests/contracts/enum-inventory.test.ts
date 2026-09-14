@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ACTOR_TYPES,
+  ACTION_TIERS,
   APPROVAL_STATUSES,
   AUTONOMY_ENVIRONMENTS,
   AUTONOMY_GRANT_STATUSES,
@@ -13,6 +14,8 @@ import {
   RISK_LEVELS,
   RUN_STATES,
   SERVICE_STATUSES,
+  TRUST_DIMENSION_IDS,
+  TRUST_SCORE_STATUSES,
 } from '../../src/index.js';
 
 /**
@@ -81,5 +84,19 @@ describe('canonical enum inventory', () => {
     expect([...ACTOR_TYPES]).toEqual(['human', 'agent', 'service', 'system']);
     expect([...RISK_LEVELS]).toEqual(['R0', 'R1', 'R2', 'R3']);
     expect([...AUTONOMY_LEVELS]).toEqual(['L0', 'L1', 'L2', 'L3', 'L4']);
+    expect([...ACTION_TIERS]).toEqual(['observe', 'assist', 'execute']);
+    expect([...TRUST_DIMENSION_IDS]).toEqual([
+      'taskCompletion',
+      'toolCorrectness',
+      'permissionCompliance',
+      'humanGateCompliance',
+      'executionCost',
+    ]);
+    expect([...TRUST_SCORE_STATUSES]).toEqual([
+      'trusted',
+      'degraded',
+      'untrusted',
+      'incomplete',
+    ]);
   });
 });
