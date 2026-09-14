@@ -16,6 +16,12 @@ import { tenantScopeAllows } from '../contracts/scope.js';
 import type { ApprovalRequest } from '../contracts/approval.js';
 import type { AutonomyGrant } from '../contracts/autonomy-grant.js';
 import { evaluateAutonomy } from '../contracts/autonomy-grant.js';
+import {
+  actionTierAllows,
+  actionTierFromAutonomy,
+  requiredActionTierForCapability,
+  type ActionTier,
+} from '../contracts/action-tier.js';
 
 export interface PolicyEngineConfig {
   /** Identifier recorded on every decision this engine produces. */
@@ -305,6 +311,29 @@ export class PolicyEngine {
           : `data scope denied: missing allowedData for [${missing.join(', ')}] (actor allows [${agent.allowedData.join(', ') || '∅'}])`;
         checks.push({ kind: 'data-scope', passed, detail });
         if (!passed) {
+          return this.deny(detail, riskLevel, checks);
+        }
+      }
+    }
+
+    // 3a2. Action Tier — Observe cannot Execute (ADR-007).
+    // Enforce when Action Tier is declared, or when autonomy is L0 (Observe).
+    // L1+ agents without actionTier keep prior authorize behavior (compat).
+    if (actor.actorType === 'agent') {
+      const agent = actor as AgentActor;
+      const declared: ActionTier | undefined =
+        agent.actionTier ??
+        (agent.autonomyLevel === 'L0'
+          ? actionTierFromAutonomy(agent.autonomyLevel)
+          : undefined);
+      if (declared !== undefined) {
+        const required = requiredActionTierForCapability(String(capability));
+        const tierOk = actionTierAllows(declared, required);
+        const detail = tierOk
+          ? `action tier ok (declared=${declared} required=${required} for ${capability})`
+          : `action tier denied: ${declared} cannot perform ${required}-tier capability "${capability}"`;
+        checks.push({ kind: 'action-tier', passed: tierOk, detail });
+        if (!tierOk) {
           return this.deny(detail, riskLevel, checks);
         }
       }

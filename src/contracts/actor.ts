@@ -3,6 +3,7 @@ import { ActorId, AgentId, ToolId } from './identifiers.js';
 import { Capability } from './capability.js';
 import { RiskLevel } from './risk.js';
 import { AutonomyLevel } from './autonomy.js';
+import { ActionTier } from './action-tier.js';
 import { AgentUri } from './agent-identity.js';
 
 /**
@@ -84,6 +85,11 @@ export const AgentActor = ActorBase.extend({
   defaultRiskLevel: RiskLevel.default('R1'),
   /** Declared autonomy ceiling; never raised by the worker itself. */
   autonomyLevel: AutonomyLevel.default('L1'),
+  /**
+   * Product Action Tier (ADR-007). When omitted, PolicyEngine derives from
+   * autonomyLevel (L0→observe, L1→assist, L2–L4→execute).
+   */
+  actionTier: ActionTier.optional(),
   /** Conditions under which the agent must stop and escalate to a human. */
   escalationConditions: z.array(z.string()).default([]),
   /** Data scopes this agent may read/write — least privilege. */
