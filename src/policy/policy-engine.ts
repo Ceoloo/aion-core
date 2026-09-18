@@ -16,6 +16,15 @@ import { tenantScopeAllows } from '../contracts/scope.js';
 import type { ApprovalRequest } from '../contracts/approval.js';
 import type { AutonomyGrant } from '../contracts/autonomy-grant.js';
 import { evaluateAutonomy } from '../contracts/autonomy-grant.js';
+import type { DelegatedAuthority } from '../contracts/authority.js';
+import {
+  authoritySubsumes,
+  authorityIsActive,
+  authorityGrantsCapability,
+  authorityAllowsRisk,
+} from '../contracts/authority.js';
+import type { Provenance } from '../contracts/provenance.js';
+import { provenanceBacksRisk, isQuarantined } from '../contracts/provenance.js';
 import {
   actionTierAllows,
   actionTierFromAutonomy,
@@ -59,6 +68,25 @@ export interface AuthorizeContext {
   autonomyGrant?: AutonomyGrant;
   /** Mission 008 — force demotion for this decision (manual override). */
   manualAutonomyDemote?: boolean;
+  /**
+   * The authority actually delegated to the actor for this execution (Sep 2026
+   * governance brief). Narrower than the actor's static grant: the requested
+   * capability and risk must fall within it. Optional — omitted for callers
+   * that have not adopted delegated authority yet.
+   */
+  authority?: DelegatedAuthority;
+  /**
+   * The parent's authority, when this actor was spawned by another. When
+   * present, the engine enforces the invariant `authority(child) ⊆
+   * authority(parent)` and denies any amplification.
+   */
+  parentAuthority?: DelegatedAuthority;
+  /**
+   * Provenance of the authority / instruction driving this request. A
+   * quarantined origin is never usable and an untrusted origin cannot back a
+   * consequential (R2+) action — the engine fails closed.
+   */
+  authorityProvenance?: Provenance;
   /** ISO timestamp override for deterministic tests. */
   now?: string;
 }
@@ -285,6 +313,74 @@ export class PolicyEngine {
     checks.push({ kind: 'identity', passed: identityOk, detail: identityDetail });
     if (!identityOk) {
       return this.deny(identityDetail, riskLevel, checks);
+    }
+
+    // 2a. Provenance — the authority/instruction driving this request must come
+    // from a trustworthy origin. A quarantined origin is never usable (it has
+    // not passed activation), and an untrusted origin cannot back a
+    // consequential (R2+) action. Fails closed.
+    if (ctx.authorityProvenance) {
+      const prov = ctx.authorityProvenance;
+      const backs = provenanceBacksRisk(prov, riskLevel);
+      const detail = backs
+        ? `provenance ok (origin=${prov.origin} trust=${prov.trustLevel})`
+        : isQuarantined(prov)
+          ? `provenance denied: ${prov.subject} ${prov.provenanceId} is quarantined — not activated`
+          : `provenance denied: ${prov.trustLevel} origin "${prov.origin}" cannot back ${riskLevel} action`;
+      checks.push({ kind: 'provenance', passed: backs, detail });
+      if (!backs) {
+        return this.deny(detail, riskLevel, checks);
+      }
+    }
+
+    // 2b. Authority delegation — the *effective* power delegated for this
+    // execution, enforced on top of the actor's static grant. Two invariants:
+    //   (i)  the requested capability + risk must fall within the delegated
+    //        authority (a worker cannot use power it was not handed);
+    //   (ii) authority(child) ⊆ authority(parent) when a parent is supplied
+    //        (delegation may only attenuate — never amplify).
+    if (ctx.authority) {
+      const authority = ctx.authority;
+      const problems: string[] = [];
+
+      if (!authorityIsActive(authority, now)) {
+        problems.push(
+          `authority ${authority.authorityId} is not active (status=${authority.status})`,
+        );
+      }
+      if (authority.tenantId !== request.tenantId) {
+        problems.push(
+          `authority tenant "${authority.tenantId}" != request tenant "${request.tenantId}"`,
+        );
+      }
+      if (!authorityGrantsCapability(authority, capability)) {
+        problems.push(
+          `capability "${capability}" is not within delegated authority ${authority.authorityId}`,
+        );
+      }
+      if (!authorityAllowsRisk(authority, riskLevel)) {
+        problems.push(
+          `action risk ${riskLevel} exceeds delegated authority ceiling ${authority.maxRiskLevel}`,
+        );
+      }
+      if (ctx.parentAuthority) {
+        const subset = authoritySubsumes(ctx.parentAuthority, authority);
+        if (!subset.ok) {
+          problems.push(`authority amplification: ${subset.violations.join('; ')}`);
+        }
+      }
+
+      const passed = problems.length === 0;
+      const detail = passed
+        ? `delegated authority ${authority.authorityId} covers "${capability}" at ${riskLevel}` +
+          (ctx.parentAuthority
+            ? ` within parent ${ctx.parentAuthority.authorityId}`
+            : '')
+        : problems.join('; ');
+      checks.push({ kind: 'authority-delegation', passed, detail });
+      if (!passed) {
+        return this.deny(detail, riskLevel, checks);
+      }
     }
 
     // 3. Permission — from authenticated actor, never from request.permissions.
