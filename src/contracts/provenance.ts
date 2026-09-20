@@ -164,12 +164,15 @@ export function isQuarantined(p: Provenance): boolean {
 
 /**
  * Whether content carrying this provenance may be treated as an instruction the
- * runtime acts on. Requires an explicit `instructionAllowed` flag AND at least
- * `declared` trust — an untrusted or quarantined origin can never self-elevate
- * from data to instruction, no matter what its content says.
+ * runtime acts on. Requires all three: an explicit `instructionAllowed` flag, an
+ * authoritative principal origin (human / operator / system — never an agent- or
+ * tool-authored value), AND at least `declared` trust. An untrusted or
+ * quarantined origin, or a non-principal one, can never self-elevate from data to
+ * instruction, no matter what its content says.
  */
 export function mayActAsInstruction(p: Provenance): boolean {
   if (!p.instructionAllowed) return false;
+  if (!PROVENANCE_PRINCIPAL_ORIGINS.includes(p.origin)) return false;
   return provenanceTrustAtLeast(p.trustLevel, 'declared');
 }
 

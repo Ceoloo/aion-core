@@ -76,7 +76,18 @@ describe('Provenance contract', () => {
       expect(mayActAsInstruction(p)).toBe(false);
     });
 
-    it('is true only when explicitly allowed AND at least declared trust', () => {
+    it('is false for a non-principal (agent/tool) origin even if allowed + trusted', () => {
+      const p = createProvenance({
+        subject: 'memory',
+        origin: 'agent',
+        trustLevel: 'trusted',
+        instructionAllowed: true,
+      });
+      // An agent cannot authorize its own memory to steer the runtime.
+      expect(mayActAsInstruction(p)).toBe(false);
+    });
+
+    it('is true only when explicitly allowed AND a principal origin AND >= declared trust', () => {
       const p = createProvenance({
         subject: 'instruction',
         origin: 'operator',

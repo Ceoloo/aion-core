@@ -122,6 +122,25 @@ function minAutonomy(a: AutonomyLevel, b: AutonomyLevel): AutonomyLevel {
   return autonomyRank(a) <= autonomyRank(b) ? a : b;
 }
 
+/**
+ * Compare two ISO-8601 timestamps chronologically. Parsing to epoch ms avoids
+ * the lexicographic pitfall where `2026-01-01T00:00:00Z` sorts after
+ * `2026-01-01T00:00:00.500Z` as plain strings.
+ */
+function isoMs(value: string): number {
+  return new Date(value).getTime();
+}
+
+/** True when instant `a` is strictly before instant `b`. */
+function isoBefore(a: string, b: string): boolean {
+  return isoMs(a) < isoMs(b);
+}
+
+/** True when instant `a` is strictly after instant `b`. */
+function isoAfter(a: string, b: string): boolean {
+  return isoMs(a) > isoMs(b);
+}
+
 /** Result of a subset (attenuation) check. */
 export interface AuthoritySubsetResult {
   ok: boolean;
@@ -207,7 +226,7 @@ export function authoritySubsumes(
       violations.push(
         'lifetime escalation: parent authority expires but child never does',
       );
-    } else if (child.expiresAt > parent.expiresAt) {
+    } else if (isoAfter(child.expiresAt, parent.expiresAt)) {
       violations.push(
         `lifetime escalation: child expires ${child.expiresAt} after parent ${parent.expiresAt}`,
       );
@@ -215,6 +234,26 @@ export function authoritySubsumes(
   }
 
   return { ok: violations.length === 0, violations };
+}
+
+/**
+ * True when `child`'s principal chain is exactly `parent`'s chain extended by
+ * one link ending at the child's own subject — i.e. the delegation is a genuine
+ * continuation of the parent's, not a forged or re-parented chain.
+ * {@link attenuateAuthority} always produces a continuing chain.
+ */
+export function principalChainContinues(
+  parent: DelegatedAuthority,
+  child: DelegatedAuthority,
+): boolean {
+  const p = parent.principalChain;
+  const c = child.principalChain;
+  if (c.length !== p.length + 1) return false;
+  for (let i = 0; i < p.length; i += 1) {
+    if (c[i]?.kind !== p[i]?.kind || c[i]?.ref !== p[i]?.ref) return false;
+  }
+  const last = c[c.length - 1];
+  return last?.kind === child.subject.kind && last?.ref === child.subject.ref;
 }
 
 export interface AttenuateAuthorityInput {
@@ -287,7 +326,9 @@ export function attenuateAuthority(
   let expiresAt = input.expiresAt;
   if (parent.expiresAt) {
     expiresAt =
-      expiresAt && expiresAt < parent.expiresAt ? expiresAt : parent.expiresAt;
+      expiresAt && isoBefore(expiresAt, parent.expiresAt)
+        ? expiresAt
+        : parent.expiresAt;
   }
 
   return DelegatedAuthority.parse({
@@ -365,7 +406,7 @@ export function authorityIsActive(
   now: string,
 ): boolean {
   if (authority.status !== 'active') return false;
-  if (authority.expiresAt && authority.expiresAt < now) return false;
+  if (authority.expiresAt && isoBefore(authority.expiresAt, now)) return false;
   return true;
 }
 

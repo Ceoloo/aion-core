@@ -7,6 +7,7 @@ import {
   authorityGrantsCapability,
   authorityAllowsRisk,
   effectiveRiskCeiling,
+  principalChainContinues,
   DelegatedAuthority,
   capability,
   newToolId,
@@ -186,6 +187,30 @@ describe('authority helpers', () => {
     expect(authorityIsActive(a, '2026-07-01T00:00:00.000Z')).toBe(false);
     const revoked = DelegatedAuthority.parse({ ...a, status: 'revoked' });
     expect(authorityIsActive(revoked, '2026-05-01T00:00:00.000Z')).toBe(false);
+  });
+
+  it('authorityIsActive compares timestamps chronologically, not lexically', () => {
+    // Codex P2: "…00Z" < "…00.500Z" is false lexically, but 00.000 IS before
+    // 00.500 chronologically — the authority must read as expired.
+    const a = root({ expiresAt: '2026-01-01T00:00:00Z' });
+    expect(authorityIsActive(a, '2026-01-01T00:00:00.500Z')).toBe(false);
+    expect(authorityIsActive(a, '2025-12-31T23:59:59.500Z')).toBe(true);
+  });
+
+  it('principalChainContinues accepts an extended chain and rejects a broken one', () => {
+    const parent = root();
+    const child = attenuateAuthority(parent, {
+      subject: worker,
+      grantReason: 'extend chain',
+    });
+    expect(principalChainContinues(parent, child)).toBe(true);
+    // A child whose chain does not extend the parent's is rejected.
+    const forged = DelegatedAuthority.parse({
+      ...child,
+      authorityId: 'auth_forged',
+      principalChain: [worker],
+    });
+    expect(principalChainContinues(parent, forged)).toBe(false);
   });
 
   it('authorityAllowsRisk honours the ceiling', () => {
