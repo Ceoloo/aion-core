@@ -140,6 +140,20 @@ describe('PolicyEngine.authorize — delegated authority', () => {
     expect(decision.reason).toContain('not within delegated authority');
   });
 
+  it('DENYs a company-scoped authority when the request names no company', () => {
+    const actor = agent(['crm.read']);
+    const authority = rootAuthorityFor(actor, {
+      capabilities: [CRM_READ],
+      companyId: 'co-1',
+    });
+    const decision = engine.authorize(
+      auth(actor, { action: 'read', capability: 'crm.read' }),
+      { actor, authority, now: NOW },
+    );
+    expect(decision.decision).toBe('DENY');
+    expect(decision.reason).toContain('!= request company');
+  });
+
   it('DENYs an estimated cost above the delegated authority budget', () => {
     const actor = agent(['crm.read']);
     const authority = rootAuthorityFor(actor, {

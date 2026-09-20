@@ -213,6 +213,30 @@ describe('authority helpers', () => {
     expect(principalChainContinues(parent, forged)).toBe(false);
   });
 
+  it('principalChainContinues rejects upward-kind delegation (tool → human)', () => {
+    const toolP: Principal = { kind: 'tool', ref: 'tool://x' };
+    const toolRoot = createRootAuthority({
+      subject: toolP,
+      tenantId: 'tenant-a',
+      grantReason: 'tool root',
+      capabilities: [CRM_READ],
+    });
+    const humanChild = DelegatedAuthority.parse({
+      ...toolRoot,
+      authorityId: 'auth_upward',
+      parentAuthorityId: toolRoot.authorityId,
+      subject: human,
+      principalChain: [toolP, human],
+    });
+    expect(principalChainContinues(toolRoot, humanChild)).toBe(false);
+  });
+
+  it('authorityIsActive is inactive at the exact expiry instant', () => {
+    const a = root({ expiresAt: '2026-06-01T00:00:00.000Z' });
+    expect(authorityIsActive(a, '2026-06-01T00:00:00.000Z')).toBe(false);
+    expect(authorityIsActive(a, '2026-05-31T23:59:59.999Z')).toBe(true);
+  });
+
   it('authorityAllowsRisk honours the ceiling', () => {
     const a = root({ maxRiskLevel: 'R2' });
     expect(authorityAllowsRisk(a, 'R2')).toBe(true);

@@ -386,14 +386,11 @@ export class PolicyEngine {
           `authority tenant "${authority.tenantId}" != request tenant "${request.tenantId}"`,
         );
       }
-      // Company scope: a company-scoped authority confines the request.
-      if (
-        authority.companyId &&
-        request.companyId &&
-        authority.companyId !== request.companyId
-      ) {
+      // Company scope: a company-scoped authority confines the request and
+      // fails closed when the request names no company at all.
+      if (authority.companyId && authority.companyId !== request.companyId) {
         problems.push(
-          `authority company "${authority.companyId}" != request company "${request.companyId}"`,
+          `authority company "${authority.companyId}" != request company "${request.companyId ?? 'none'}"`,
         );
       }
 
@@ -482,6 +479,11 @@ export class PolicyEngine {
           }
         }
       } else if (ctx.parentAuthority) {
+        if (!principalChainContinues(ctx.parentAuthority, authority)) {
+          problems.push(
+            `principal chain does not continue parent ${ctx.parentAuthority.authorityId}`,
+          );
+        }
         const subset = authoritySubsumes(ctx.parentAuthority, authority);
         if (!subset.ok) {
           problems.push(

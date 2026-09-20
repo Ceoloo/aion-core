@@ -114,10 +114,12 @@ export const DelegatedAuthority = z.object({
 });
 export type DelegatedAuthority = z.infer<typeof DelegatedAuthority>;
 
+/** Numeric rank of an autonomy level (higher index = more autonomy). */
 function autonomyRank(level: AutonomyLevel): number {
   return AUTONOMY_LEVELS.indexOf(level);
 }
 
+/** The lower (more restrictive) of two autonomy levels. */
 function minAutonomy(a: AutonomyLevel, b: AutonomyLevel): AutonomyLevel {
   return autonomyRank(a) <= autonomyRank(b) ? a : b;
 }
@@ -248,6 +250,22 @@ export function principalChainContinues(
 ): boolean {
   const p = parent.principalChain;
   const c = child.principalChain;
+  // The parent's own chain must terminate at its subject — otherwise the parent
+  // record itself is inconsistent and cannot anchor a continuation.
+  const parentLast = p[p.length - 1];
+  if (
+    parentLast?.kind !== parent.subject.kind ||
+    parentLast?.ref !== parent.subject.ref
+  ) {
+    return false;
+  }
+  // Delegation may not move UP the principal hierarchy: a tool cannot mint a
+  // human child. PRINCIPAL_KINDS is ordered most-authoritative first, so the
+  // child's rank must be >= the parent's.
+  const parentRank = PRINCIPAL_KINDS.indexOf(parent.subject.kind);
+  const childRank = PRINCIPAL_KINDS.indexOf(child.subject.kind);
+  if (childRank < parentRank) return false;
+  // The child chain must be exactly the parent's chain plus the child's subject.
   if (c.length !== p.length + 1) return false;
   for (let i = 0; i < p.length; i += 1) {
     if (c[i]?.kind !== p[i]?.kind || c[i]?.ref !== p[i]?.ref) return false;
@@ -406,7 +424,10 @@ export function authorityIsActive(
   now: string,
 ): boolean {
   if (authority.status !== 'active') return false;
-  if (authority.expiresAt && isoBefore(authority.expiresAt, now)) return false;
+  // Inclusive: an authority is invalid at and after its expiry instant.
+  if (authority.expiresAt && isoMs(authority.expiresAt) <= isoMs(now)) {
+    return false;
+  }
   return true;
 }
 
