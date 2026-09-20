@@ -21,8 +21,8 @@ describe('opportunity entity-state routing', () => {
   it('routes create → update when opportunityId is present', () => {
     expect(
       resolveOpportunityCapability(create, {
-        opportunityId: 'rGbIyrAvGDcmMEzjBER4',
-        contactId: 'MyWCgeFaKnifp6LM7yIc',
+        opportunityId: 'fixture_opportunity_0001',
+        contactId: 'fixture_contact_0001',
       }),
     ).toBe(update);
   });
@@ -30,7 +30,7 @@ describe('opportunity entity-state routing', () => {
   it('accepts ghlOpportunityId alias', () => {
     expect(
       resolveOpportunityCapability(create, {
-        ghlOpportunityId: 'rGbIyrAvGDcmMEzjBER4',
+        ghlOpportunityId: 'fixture_opportunity_0001',
       }),
     ).toBe(update);
   });
@@ -38,12 +38,12 @@ describe('opportunity entity-state routing', () => {
   it('does not rewrite non-create capabilities', () => {
     expect(
       resolveOpportunityCapability(update, {
-        opportunityId: 'rGbIyrAvGDcmMEzjBER4',
+        opportunityId: 'fixture_opportunity_0001',
       }),
     ).toBe(update);
     expect(
       resolveOpportunityCapability(note, {
-        opportunityId: 'rGbIyrAvGDcmMEzjBER4',
+        opportunityId: 'fixture_opportunity_0001',
       }),
     ).toBe(note);
   });
