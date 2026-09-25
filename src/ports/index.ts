@@ -12,3 +12,4 @@ export type { RunRepository } from './run-repository.js';
 export type { EventSink } from './event-sink.js';
 export type { ApprovalStore } from './approval-store.js';
 export type { TelemetrySink } from './telemetry-sink.js';
+export type { FeatureGate, FeatureGateContext } from './feature-gate.js';

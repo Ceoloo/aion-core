@@ -29,6 +29,8 @@ export type {
   EventSink,
   ApprovalStore,
   TelemetrySink,
+  FeatureGate,
+  FeatureGateContext,
 } from './ports/index.js';
 
 // ── Policy layer ────────────────────────────────────────────────────────────
@@ -86,6 +88,14 @@ export {
 export { InMemoryRunRepository } from './adapters/in-memory-run-repository.js';
 export { InMemoryMissionRepository } from './adapters/in-memory-mission-repository.js';
 export { InMemoryWorkflowRepository } from './adapters/in-memory-workflow-repository.js';
+export {
+  StaticFeatureGate,
+  type StaticFeatureGateConfig,
+  alwaysEnabledFeatureGate,
+  resolveEnabled,
+  agentEnabledFlag,
+  isAgentEnabled,
+} from './adapters/static-feature-gate.js';
 
 // ── Orchestration kernel ────────────────────────────────────────────────────
 export {
