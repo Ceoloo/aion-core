@@ -18,6 +18,8 @@ export * from './mission.js';
 export * from './command.js';
 export * from './event.js';
 export * from './policy.js';
+export * from './provenance.js';
+export * from './authority.js';
 export * from './approval.js';
 export * from './result.js';
 export * from './outcome.js';

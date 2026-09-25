@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ExecutionId } from './identifiers.js';
-import { EXECUTION_OBJECT_STATUSES } from './execution.js';
-import { OUTCOME_STATUSES } from './outcome.js';
+import type { EXECUTION_OBJECT_STATUSES } from './execution.js';
+import type { OUTCOME_STATUSES } from './outcome.js';
 
 /**
  * Agent Trust Score (ADR-006) — per-execution trust judgment.
@@ -308,8 +308,6 @@ export function computeAgentTrustScore(
     evidence.evaluationPresent === true
   ) {
     overall = 'trusted';
-  } else if (taskIncomplete) {
-    overall = 'incomplete';
   } else {
     overall = 'degraded';
   }

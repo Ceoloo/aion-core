@@ -24,6 +24,8 @@ export type PolicyDecisionKind = z.infer<typeof PolicyDecisionKind>;
 export const POLICY_CHECK_KINDS = [
   'tenant-scope',
   'identity',
+  'provenance',
+  'authority-delegation',
   'permission',
   'data-scope',
   'action-tier',

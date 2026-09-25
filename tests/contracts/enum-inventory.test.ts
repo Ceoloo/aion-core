@@ -11,6 +11,11 @@ import {
   MISSION_STATUSES,
   OPERATION_STATUSES,
   OUTCOME_STATUSES,
+  PRINCIPAL_KINDS,
+  PROVENANCE_ORIGINS,
+  PROVENANCE_SUBJECTS,
+  PROVENANCE_TRUST_LEVELS,
+  AUTHORITY_STATUSES,
   RISK_LEVELS,
   RUN_STATES,
   SERVICE_STATUSES,
@@ -85,6 +90,40 @@ describe('canonical enum inventory', () => {
     expect([...RISK_LEVELS]).toEqual(['R0', 'R1', 'R2', 'R3']);
     expect([...AUTONOMY_LEVELS]).toEqual(['L0', 'L1', 'L2', 'L3', 'L4']);
     expect([...ACTION_TIERS]).toEqual(['observe', 'assist', 'execute']);
+    expect([...AUTHORITY_STATUSES]).toEqual(['active', 'revoked', 'expired']);
+    expect([...PRINCIPAL_KINDS]).toEqual([
+      'human',
+      'operator',
+      'orchestrator',
+      'sub-agent',
+      'tool',
+    ]);
+    expect([...PROVENANCE_SUBJECTS]).toEqual([
+      'authority',
+      'instruction',
+      'credential',
+      'resource',
+      'memory',
+      'tool',
+      'agent',
+      'data',
+    ]);
+    expect([...PROVENANCE_ORIGINS]).toEqual([
+      'human',
+      'operator',
+      'orchestrator',
+      'agent',
+      'tool',
+      'external',
+      'system',
+      'unknown',
+    ]);
+    expect([...PROVENANCE_TRUST_LEVELS]).toEqual([
+      'quarantined',
+      'untrusted',
+      'declared',
+      'trusted',
+    ]);
     expect([...TRUST_DIMENSION_IDS]).toEqual([
       'taskCompletion',
       'toolCorrectness',
