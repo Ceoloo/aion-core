@@ -16,6 +16,7 @@ import type { ExecutionRequest } from '../execution/execution-adapter.js';
 import type { ApprovalGate } from '../approvals/approval-gate.js';
 import type { RunRepository } from '../ports/run-repository.js';
 import type { FeatureGate, FeatureGateContext } from '../ports/feature-gate.js';
+import { resolveEnabled, agentEnabledFlag } from '../adapters/static-feature-gate.js';
 import type { AgentActor } from '../contracts/actor.js';
 import type { EventEmitter } from '../events/event-emitter.js';
 import type { Telemetry } from '../observability/telemetry.js';
@@ -268,7 +269,7 @@ export class Orchestrator {
     const agent = actor as AgentActor;
     if (!agent.domain) return null;
 
-    const flag = `agent.${agent.domain}.enabled`;
+    const flag = agentEnabledFlag(agent.domain);
     const tenantId = command.tenantId ?? agent.tenantId;
     const context: FeatureGateContext = {
       actorId: agent.actorId,
@@ -277,12 +278,9 @@ export class Orchestrator {
       ...(tenantId ? { tenantId } : {}),
     };
 
-    let enabled = true;
-    try {
-      enabled = await gate.isEnabled(flag, context);
-    } catch {
-      enabled = true; // fail-open: a gate outage never halts governed work
-    }
+    // Fail-open AND bounded: resolveEnabled defers to `true` on a gate error or
+    // a provider that stalls, so a flag-backend outage never wedges dispatch.
+    const enabled = await resolveEnabled(gate, flag, context, true);
     return enabled ? null : { flag };
   }
 
