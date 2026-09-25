@@ -79,6 +79,12 @@ export interface HarnessRunRequest {
   /** Trace correlation into the ledger. */
   runId?: RunId;
   requestId?: RequestId;
+  /**
+   * Stable de-duplication key carried across the seam. A retry re-uses the same
+   * key so the harness de-duplicates rather than re-executing side effects
+   * (shell/fs/git). Required to safely reconcile an `indeterminate` outcome.
+   */
+  idempotencyKey?: string;
   /** Request server-sent events when the provider supports streaming. */
   stream?: boolean;
 }
@@ -90,9 +96,14 @@ export interface HarnessUsage {
   latencyMs?: number;
 }
 
-/** The normalized outcome of a harness run. A failure is first-class. */
+/**
+ * The normalized outcome of a harness run. A failure is first-class. `indeterminate`
+ * means the outcome is unknown (a lost response/stream): the harness MAY still be
+ * running, so the caller must reconcile or cancel by {@link HarnessRunRequest.idempotencyKey}
+ * before treating it as terminal — it is never assumed to be a clean failure.
+ */
 export interface HarnessRunResult {
-  status: 'succeeded' | 'failed' | 'cancelled';
+  status: 'succeeded' | 'failed' | 'cancelled' | 'indeterminate';
   harnessId: HarnessId;
   model?: string;
   /** The (possibly newly created) session whose workspace ran the task. */

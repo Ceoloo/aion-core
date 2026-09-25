@@ -21,6 +21,8 @@ export interface InMemoryHarnessConfig {
   harnesses?: HarnessDescriptor[];
   /** Harness ids that should return a failed result (to test fail-closed). */
   failFor?: HarnessId[];
+  /** Harness ids that should return an indeterminate result (lost outcome). */
+  indeterminateFor?: HarnessId[];
   /** Fixed usage returned on success. */
   usageUnits?: number;
 }
@@ -28,6 +30,7 @@ export interface InMemoryHarnessConfig {
 export class InMemoryHarnessProvider implements HarnessExecutionProvider {
   private readonly harnesses: HarnessDescriptor[];
   private readonly failFor: Set<HarnessId>;
+  private readonly indeterminateFor: Set<HarnessId>;
   private readonly usageUnits: number;
   /** Every run request seen, in order — for test assertions. */
   readonly calls: HarnessRunRequest[] = [];
@@ -40,6 +43,7 @@ export class InMemoryHarnessProvider implements HarnessExecutionProvider {
       { id: 'echo', kind: 'in-memory', capabilities: [] },
     ];
     this.failFor = new Set(config.failFor ?? []);
+    this.indeterminateFor = new Set(config.indeterminateFor ?? []);
     this.usageUnits = config.usageUnits ?? 1;
   }
 
@@ -74,6 +78,15 @@ export class InMemoryHarnessProvider implements HarnessExecutionProvider {
         ...(request.model !== undefined ? { model: request.model } : {}),
         sessionId,
         error: { code: 'HARNESS_ERROR', message: 'configured failure', retryable: true },
+      };
+    }
+    if (this.indeterminateFor.has(request.harnessId)) {
+      return {
+        status: 'indeterminate',
+        harnessId: request.harnessId,
+        ...(request.model !== undefined ? { model: request.model } : {}),
+        sessionId,
+        error: { code: 'HARNESS_TRANSPORT_LOST', message: 'response lost', retryable: true },
       };
     }
 

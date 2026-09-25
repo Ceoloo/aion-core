@@ -122,6 +122,29 @@ describe('HarnessExecutionAdapter (ADR-011)', () => {
     expect(outcome.run.state).toBe('failed');
   });
 
+  it('treats an indeterminate outcome as failed-but-flagged with the idempotency key', async () => {
+    const provider = new InMemoryHarnessProvider({
+      harnesses: [{ id: 'codex', kind: 'codex' }],
+      indeterminateFor: ['codex'],
+    });
+    const plane = createInMemoryControlPlane({
+      clock: new ManualClock(),
+      policy: R1,
+      adapters: [new HarnessExecutionAdapter(provider)],
+    });
+
+    const outcome = await plane.orchestrator.submit(command('codex'));
+
+    expect(outcome.result?.status).toBe('failed'); // never a silent success
+    expect(outcome.result?.error?.code).toBe('HARNESS_TRANSPORT_LOST');
+    expect(outcome.result?.error?.retryable).toBe(true);
+    // Flagged so the ledger reconciles/cancels rather than blindly retrying.
+    expect(outcome.result?.metadata).toMatchObject({ indeterminate: true });
+    expect(outcome.result?.metadata.idempotencyKey).toBe(outcome.run.requestId);
+    // The dispatch carried a stable idempotency key across the seam.
+    expect(provider.calls[0]?.idempotencyKey).toBe(outcome.run.requestId);
+  });
+
   it('normalizes an unknown harness to a failed result', async () => {
     const provider = new InMemoryHarnessProvider({ harnesses: [{ id: 'codex', kind: 'codex' }] });
     const plane = createInMemoryControlPlane({

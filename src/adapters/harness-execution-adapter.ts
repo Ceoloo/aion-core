@@ -96,6 +96,9 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
       riskLevel: request.riskLevel,
       runId: request.runId,
       requestId: request.requestId,
+      // Stable de-dup key so a retry after an indeterminate outcome does not
+      // re-run side effects; the requestId is stable per authorized request.
+      idempotencyKey: request.requestId,
       ...(request.contextReference !== undefined
         ? { contextReference: request.contextReference }
         : {}),
@@ -125,6 +128,14 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
     if (run.sessionId !== undefined) metadata.sessionId = run.sessionId;
     if (run.transcriptRef !== undefined) metadata.transcriptRef = run.transcriptRef;
     if (run.status === 'cancelled') metadata.cancelled = true;
+    if (run.status === 'indeterminate') {
+      // Not a clean failure: the harness may still be running. Flag it (with the
+      // idempotency key) so the ledger/operator reconciles or cancels rather
+      // than retrying blindly. Reported as failed so no downstream treats it as
+      // a success — but marked distinct.
+      metadata.indeterminate = true;
+      if (request.requestId !== undefined) metadata.idempotencyKey = request.requestId;
+    }
 
     const cost = { units: run.usage?.units ?? 0, ...(run.usage?.tokens !== undefined ? { tokens: run.usage.tokens } : {}) };
 
@@ -139,14 +150,22 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
       });
     }
 
+    const defaultCode =
+      run.status === 'cancelled'
+        ? 'HARNESS_CANCELLED'
+        : run.status === 'indeterminate'
+          ? 'HARNESS_INDETERMINATE'
+          : 'HARNESS_FAILED';
     return finish({
       status: 'failed',
       executor: `${this.name}:${run.harnessId}`,
       ...(run.model !== undefined ? { model: run.model } : {}),
       error: {
-        code: run.error?.code ?? (run.status === 'cancelled' ? 'HARNESS_CANCELLED' : 'HARNESS_FAILED'),
+        code: run.error?.code ?? defaultCode,
         message: run.error?.message ?? run.status,
-        retryable: run.error?.retryable ?? false,
+        // An indeterminate outcome is retryable — but only under the idempotency
+        // key (see metadata) so the retry reconciles rather than re-executes.
+        retryable: run.error?.retryable ?? run.status === 'indeterminate',
       },
       cost,
       metadata,
