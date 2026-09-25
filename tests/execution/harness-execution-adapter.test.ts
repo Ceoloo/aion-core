@@ -65,6 +65,44 @@ describe('HarnessExecutionAdapter (ADR-011)', () => {
     expect(provider.calls[0]?.input).toBe('draft an outreach email');
   });
 
+  it('clamps the dispatched budget to the authorized actor ceiling', async () => {
+    const provider = new InMemoryHarnessProvider({ harnesses: [{ id: 'codex', kind: 'codex' }] });
+    const plane = createInMemoryControlPlane({
+      clock: new ManualClock(),
+      policy: R1,
+      adapters: [new HarnessExecutionAdapter(provider)],
+    });
+    const budgetedAgent = createAgentActor({
+      name: 'Budgeted',
+      purpose: 'x',
+      owner: 'o',
+      domain: 'revenue',
+      permissions: [OUTREACH],
+      maxRiskLevel: 'R3',
+      costBudget: 5,
+    });
+
+    // Caller asks for 1000; the actor's ceiling is 5 → dispatched budget is 5.
+    await plane.orchestrator.submit({
+      name: 'SendOutreach',
+      actor: budgetedAgent,
+      capability: OUTREACH,
+      payload: { goal: 'g' },
+      metadata: { harnessId: 'codex', budgetUnits: 1000 },
+    });
+    expect(provider.calls[0]?.budgetUnits).toBe(5);
+
+    // Caller omits a budget → defaults to the ceiling, not unbounded.
+    await plane.orchestrator.submit({
+      name: 'SendOutreach',
+      actor: budgetedAgent,
+      capability: OUTREACH,
+      payload: { goal: 'g' },
+      metadata: { harnessId: 'codex' },
+    });
+    expect(provider.calls[1]?.budgetUnits).toBe(5);
+  });
+
   it('fails closed when the provider errors (visible failed result)', async () => {
     const provider = new InMemoryHarnessProvider({
       harnesses: [{ id: 'codex', kind: 'codex' }],

@@ -25,9 +25,10 @@ export interface HarnessExecutionAdapterOptions {
   name?: string;
   clock?: Clock;
   /**
-   * Resolve which harness a command targets. Default: `metadata.harnessId`, else
-   * the command's `toolId`. Override to route by capability, risk, tenant, or an
-   * experiment (the ExperimentProvider pattern) — selection is not authority.
+   * Resolve which harness a command targets. Default: `metadata.harnessId` only
+   * (no `toolId` fallback — see {@link defaultResolveHarnessId}). Override to
+   * route by capability, risk, tenant, or an experiment (the ExperimentProvider
+   * pattern) — selection is not authority.
    */
   resolveHarnessId?: (request: ExecutionRequest) => HarnessId | undefined;
 }
@@ -52,14 +53,18 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
   }
 
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
-    const startedAt = this.clock.isoNow();
-    const start = Date.now();
-    const finish = (result: Omit<ExecutionResult, 'startedAt' | 'completedAt' | 'durationMs'>): ExecutionResult => ({
-      ...result,
-      startedAt,
-      completedAt: this.clock.isoNow(),
-      durationMs: Math.max(0, Date.now() - start),
-    });
+    // Measure timestamps AND duration from the one injected clock, so they stay
+    // consistent (and deterministic under a ManualClock).
+    const started = this.clock.now();
+    const finish = (result: Omit<ExecutionResult, 'startedAt' | 'completedAt' | 'durationMs'>): ExecutionResult => {
+      const completed = this.clock.now();
+      return {
+        ...result,
+        startedAt: started.toISOString(),
+        completedAt: completed.toISOString(),
+        durationMs: Math.max(0, completed.getTime() - started.getTime()),
+      };
+    };
 
     const harnessId = this.resolveHarnessId(request);
     if (!harnessId) {
@@ -77,7 +82,14 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
     }
 
     const model = stringMeta(request.command, 'model');
-    const budgetUnits = numberMeta(request.command, 'budgetUnits');
+    // Budget: the authorized actor's costBudget is the ceiling, NOT the
+    // caller-supplied metadata (which the policy path does not validate). Clamp
+    // to it, and default to it when metadata omits a budget, so a budgeted agent
+    // can never dispatch an unbounded or over-ceiling run.
+    const budgetUnits = effectiveBudget(
+      numberMeta(request.command, 'budgetUnits'),
+      actorCostBudget(request.command),
+    );
     const runRequest: HarnessRunRequest = {
       harnessId,
       input: harnessInput(request.command),
@@ -142,11 +154,36 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
   }
 }
 
-/** metadata.harnessId (a string), else the command's toolId. */
+/**
+ * Only claim a command that EXPLICITLY targets a harness via
+ * `metadata.harnessId`. We deliberately do NOT fall back to `toolId`: this
+ * adapter would otherwise claim any `tool_*` command, and since the
+ * ExecutionRegistry takes the first matching adapter and never retries, that
+ * would hijack unrelated tool work. Override `resolveHarnessId` to route by
+ * capability/risk/experiment (still not authority).
+ */
 function defaultResolveHarnessId(request: ExecutionRequest): HarnessId | undefined {
   const fromMeta = request.command.metadata['harnessId'];
-  if (typeof fromMeta === 'string' && fromMeta.length > 0) return fromMeta;
-  return request.command.toolId;
+  return typeof fromMeta === 'string' && fromMeta.length > 0 ? fromMeta : undefined;
+}
+
+/** The authorized actor's cost ceiling (agents only), else undefined. */
+function actorCostBudget(command: Command): number | undefined {
+  const actor = command.actor;
+  if (actor.actorType !== 'agent') return undefined;
+  return typeof actor.costBudget === 'number' && Number.isFinite(actor.costBudget)
+    ? actor.costBudget
+    : undefined;
+}
+
+/**
+ * The budget to dispatch: never above the authorized `ceiling`, defaulting to
+ * the ceiling when the request omits one. With no ceiling, the requested value
+ * (if any) is used as-is.
+ */
+function effectiveBudget(requested: number | undefined, ceiling: number | undefined): number | undefined {
+  if (ceiling === undefined) return requested;
+  return requested === undefined ? ceiling : Math.min(requested, ceiling);
 }
 
 /** The goal handed to the harness: an explicit `payload.goal`, else the command name. */
