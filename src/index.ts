@@ -31,6 +31,13 @@ export type {
   TelemetrySink,
   FeatureGate,
   FeatureGateContext,
+  HarnessExecutionProvider,
+  HarnessDescriptor,
+  HarnessEnvRef,
+  HarnessRunRequest,
+  HarnessRunResult,
+  HarnessUsage,
+  HarnessId,
 } from './ports/index.js';
 
 // ── Policy layer ────────────────────────────────────────────────────────────
@@ -96,6 +103,14 @@ export {
   agentEnabledFlag,
   isAgentEnabled,
 } from './adapters/static-feature-gate.js';
+export {
+  InMemoryHarnessProvider,
+  type InMemoryHarnessConfig,
+} from './adapters/in-memory-harness-provider.js';
+export {
+  HarnessExecutionAdapter,
+  type HarnessExecutionAdapterOptions,
+} from './adapters/harness-execution-adapter.js';
 
 // ── Orchestration kernel ────────────────────────────────────────────────────
 export {

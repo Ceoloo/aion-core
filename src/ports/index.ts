@@ -13,3 +13,12 @@ export type { EventSink } from './event-sink.js';
 export type { ApprovalStore } from './approval-store.js';
 export type { TelemetrySink } from './telemetry-sink.js';
 export type { FeatureGate, FeatureGateContext } from './feature-gate.js';
+export type {
+  HarnessExecutionProvider,
+  HarnessDescriptor,
+  HarnessEnvRef,
+  HarnessRunRequest,
+  HarnessRunResult,
+  HarnessUsage,
+  HarnessId,
+} from './harness-execution-provider.js';
