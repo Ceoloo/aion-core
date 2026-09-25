@@ -15,6 +15,9 @@ import type { ExecutionRegistry } from '../execution/execution-registry.js';
 import type { ExecutionRequest } from '../execution/execution-adapter.js';
 import type { ApprovalGate } from '../approvals/approval-gate.js';
 import type { RunRepository } from '../ports/run-repository.js';
+import type { FeatureGate, FeatureGateContext } from '../ports/feature-gate.js';
+import { resolveEnabled, agentEnabledFlag } from '../adapters/static-feature-gate.js';
+import type { AgentActor } from '../contracts/actor.js';
 import type { EventEmitter } from '../events/event-emitter.js';
 import type { Telemetry } from '../observability/telemetry.js';
 import type { Clock } from '../observability/clock.js';
@@ -36,6 +39,14 @@ export interface OrchestratorDeps {
   events: EventEmitter;
   telemetry: Telemetry;
   clock?: Clock;
+  /**
+   * Optional rollout/kill-switch gate (ADR-010 Phase 2). Consulted BEFORE policy
+   * as an input, never as authority: it can withhold a switched-off agent, but a
+   * missing gate or an error fails open (governed work proceeds; denial of
+   * unsafe work stays the PolicyEngine's job). When omitted, behaviour is
+   * unchanged.
+   */
+  featureGate?: FeatureGate;
 }
 
 /**
@@ -98,6 +109,14 @@ export class Orchestrator {
     ctx.run = await this.saveRun(
       transitionRun(ctx.run, 'evaluating', this.clock),
     );
+
+    // Feature-gate kill-switch (ADR-010 Phase 2): withhold a switched-off agent
+    // before any policy/execution runs. Not authority — it only withholds.
+    const killSwitch = await this.killSwitchBlocked(command);
+    if (killSwitch) {
+      return this.finishKillSwitched(ctx, killSwitch.flag, received.eventId);
+    }
+
     const decision = this.deps.policyEngine.evaluate(command);
     ctx.run = { ...ctx.run, riskLevel: decision.riskLevel };
     await this.saveRun(ctx.run);
@@ -231,6 +250,75 @@ export class Orchestrator {
       });
     }
     return parsed.data;
+  }
+
+  /**
+   * Consult the feature gate for an agent kill-switch. Returns the blocking flag
+   * when a switched-off agent must be withheld, else null. Fails open: no gate,
+   * a non-agent actor, an agent without a domain, or a gate error all mean "not
+   * blocked" — withholding governed work is opt-in, and an authority denial is
+   * the PolicyEngine's job, not the gate's.
+   */
+  private async killSwitchBlocked(
+    command: Command,
+  ): Promise<{ flag: string } | null> {
+    const gate = this.deps.featureGate;
+    if (!gate) return null;
+    const actor = command.actor;
+    if (actor.actorType !== 'agent') return null;
+    const agent = actor as AgentActor;
+    if (!agent.domain) return null;
+
+    const flag = agentEnabledFlag(agent.domain);
+    const tenantId = command.tenantId ?? agent.tenantId;
+    const context: FeatureGateContext = {
+      actorId: agent.actorId,
+      capability: command.capability,
+      ...(agent.agentUri ? { agentUri: agent.agentUri } : {}),
+      ...(tenantId ? { tenantId } : {}),
+    };
+
+    // Fail-open AND bounded: resolveEnabled defers to `true` on a gate error or
+    // a provider that stalls, so a flag-backend outage never wedges dispatch.
+    const enabled = await resolveEnabled(gate, flag, context, true);
+    return enabled ? null : { flag };
+  }
+
+  private async finishKillSwitched(
+    ctx: RunContext,
+    flag: string,
+    causationId: EventId,
+  ): Promise<OrchestrationResult> {
+    const reason = `agent kill-switch active: "${flag}" is disabled`;
+    await this.deps.events.emit({
+      type: 'command.rejected',
+      trace: ctx.trace,
+      causationId,
+      payload: { reason, flag, gate: 'feature-gate' },
+    });
+    ctx.run = await this.saveRun(transitionRun(ctx.run, 'denied', this.clock));
+    const riskLevel = ctx.command.riskLevel ?? 'R0';
+    await this.deps.telemetry.record({
+      operation: 'policy.evaluate',
+      status: 'denied',
+      trace: ctx.trace,
+      decision: 'DENY',
+      riskLevel,
+      approvalState: 'not_required',
+      metadata: { killSwitch: flag },
+    });
+    const decision: PolicyDecision = {
+      decision: 'DENY',
+      reason,
+      // Deliberately NOT a policy id: this is a rollout kill-switch, not an
+      // authority decision. The distinct policyId keeps the ledger honest.
+      policyId: 'feature-gate.kill-switch',
+      riskLevel,
+      requiresApproval: false,
+      checks: [],
+      evaluatedAt: this.clock.isoNow(),
+    };
+    return { status: 'denied', run: ctx.run, command: ctx.command, decision };
   }
 
   private async pauseForApproval(

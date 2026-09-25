@@ -6,6 +6,7 @@ import { EventEmitter } from '../events/event-emitter.js';
 import { Telemetry } from '../observability/telemetry.js';
 import type { Clock } from '../observability/clock.js';
 import { systemClock } from '../observability/clock.js';
+import type { FeatureGate } from '../ports/feature-gate.js';
 
 import { InMemoryRunRepository } from '../adapters/in-memory-run-repository.js';
 import { InMemoryMissionRepository } from '../adapters/in-memory-mission-repository.js';
@@ -22,6 +23,11 @@ export interface ControlPlaneConfig {
   /** Execution adapters to register, in resolution-priority order. */
   adapters?: ExecutionAdapter[];
   clock?: Clock;
+  /**
+   * Optional feature-gate for pre-dispatch agent kill-switches. When omitted,
+   * no kill-switch consult happens and behaviour is unchanged.
+   */
+  featureGate?: FeatureGate;
 }
 
 /**
@@ -79,6 +85,7 @@ export function createInMemoryControlPlane(
     events,
     telemetry,
     clock,
+    ...(config.featureGate ? { featureGate: config.featureGate } : {}),
   });
 
   const missionOrchestrator = new MissionOrchestrator({
