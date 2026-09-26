@@ -10,6 +10,7 @@ import {
   type ExecutionRequest,
   type ExecutionResult,
   type CommandInput,
+  newExecutionId,
 } from '../../src/index.js';
 
 /** An adapter that records whether it was ever asked to execute. */
@@ -339,5 +340,61 @@ describe('Trace continuity', () => {
       .all()
       .filter((e) => e.causationId !== undefined);
     expect(withCausation.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Approval tenant binding (tenant RLS: approvals are never created tenant-less)', () => {
+  function gatedPlane() {
+    return createInMemoryControlPlane({
+      clock: new ManualClock(),
+      policy: { risk: { capabilityRisk: { 'deployment.execute': 'R3' } } },
+      adapters: [
+        new MockExecutionAdapter({
+          name: 'deploy-runtime',
+          capabilities: [DEPLOY],
+          output: { deployed: true },
+        }),
+      ],
+    });
+  }
+
+  it("stamps an agent's tenant and the command execution on the pending approval", async () => {
+    const plane = gatedPlane();
+    const agent = createAgentActor({
+      name: 'TenantDeployer',
+      purpose: 'deploy',
+      owner: 'platform',
+      permissions: [DEPLOY],
+      maxRiskLevel: 'R3',
+      tenantId: 'tenant-a',
+    });
+    const executionId = newExecutionId();
+    const pending = await plane.orchestrator.submit({
+      name: 'DeployApplication',
+      actor: agent,
+      capability: DEPLOY,
+      executionId,
+    });
+    expect(pending.status).toBe('awaiting_approval');
+    const [stored] = await plane.approvalStore.list('pending');
+    expect(stored?.tenantId).toBe('tenant-a');
+    expect(stored?.executionId).toBe(executionId);
+  });
+
+  it('prefers an explicit command tenant (human operator acting in a tenant)', async () => {
+    const plane = gatedPlane();
+    const human = createHumanActor({
+      name: 'Operator',
+      permissions: [DEPLOY],
+      maxRiskLevel: 'R3',
+    });
+    const pending = await plane.orchestrator.submit({
+      name: 'DeployApplication',
+      actor: human,
+      capability: DEPLOY,
+      tenantId: 'tenant-b',
+    });
+    expect(pending.status).toBe('awaiting_approval');
+    expect(pending.approval?.tenantId).toBe('tenant-b');
   });
 });

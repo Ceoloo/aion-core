@@ -65,6 +65,11 @@ export interface MissionRunInput {
   parentExecutionId?: ExecutionId;
   /** Optional request-id prefix for idempotent step submits. */
   requestIdPrefix?: string;
+  /**
+   * Tenant for the step commands when the actor carries none (human/system
+   * operators acting in a tenant). An agent's own tenantId always wins.
+   */
+  tenantId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -158,7 +163,7 @@ export class MissionOrchestrator {
         tenantId:
           'tenantId' in input.actor && typeof input.actor.tenantId === 'string'
             ? input.actor.tenantId
-            : undefined,
+            : input.tenantId,
         requestId: input.requestIdPrefix
           ? (`req_${input.requestIdPrefix}:step:${i}` as ReturnType<
               typeof newRequestId

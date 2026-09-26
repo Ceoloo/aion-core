@@ -239,16 +239,40 @@ export function buildMission002Catalog(): ServiceDefinitionType[] {
  */
 export const MISSION_009_SERVICE_KEYS = [
   'crm.contact.read@1',
+  'crm.contact.search@1',
   'crm.contact.enrich@1',
   'crm.contact.update@1',
   'crm.opportunity.read@1',
+  'crm.opportunity.search@1',
   'crm.opportunity.create@1',
   'crm.opportunity.update@1',
+  'crm.pipeline.read@1',
+  'crm.conversation.read@1',
+  'crm.appointment.read@1',
   'crm.note.create@1',
   'crm.task.create@1',
   'crm.message.draft@1',
   'crm.message.send@1',
 ] as const;
+
+/**
+ * Appointment *writes* remain inactive until calendar mutation is certified.
+ * `crm.appointment.read@1` is active in Mission 009 for Phase A reads.
+ */
+export const SECURE_AUTOMATION_APPOINTMENT_WRITE_KEYS = [
+  'crm.appointment.create@1',
+  'crm.appointment.update@1',
+] as const;
+
+/** @deprecated Prefer SECURE_AUTOMATION_APPOINTMENT_WRITE_KEYS + active read in M009. */
+export const SECURE_AUTOMATION_APPOINTMENT_SERVICE_KEYS = [
+  'crm.appointment.read@1',
+  'crm.appointment.create@1',
+  'crm.appointment.update@1',
+] as const;
+
+/** Minimum matchConfidence required for contact upsert / create-via-update. */
+export const CRM_CONTACT_UPSERT_MIN_CONFIDENCE = 0.85;
 
 export type Mission009ServiceKey = (typeof MISSION_009_SERVICE_KEYS)[number];
 
@@ -267,6 +291,13 @@ const MISSION_009_SPECS: ReadonlyArray<{
     approvalRequired: false,
   },
   {
+    name: 'crm.contact.search',
+    version: 1,
+    description: 'Search / list contacts in the tenant CRM workspace (read-only).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
     name: 'crm.contact.enrich',
     version: 1,
     description: 'Enrich a CRM contact with research attributes (reversible write).',
@@ -276,7 +307,8 @@ const MISSION_009_SPECS: ReadonlyArray<{
   {
     name: 'crm.contact.update',
     version: 1,
-    description: 'Update permitted CRM contact fields in the tenant workspace.',
+    description:
+      'Update permitted CRM contact fields. Upsert/create requires matchConfidence ≥ 0.85.',
     riskLevel: 'R2',
     approvalRequired: true,
   },
@@ -284,6 +316,13 @@ const MISSION_009_SPECS: ReadonlyArray<{
     name: 'crm.opportunity.read',
     version: 1,
     description: 'Read an opportunity / pipeline record from the tenant CRM.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.opportunity.search',
+    version: 1,
+    description: 'Search / list opportunities in the tenant CRM (read-only).',
     riskLevel: 'R1',
     approvalRequired: false,
   },
@@ -297,9 +336,30 @@ const MISSION_009_SPECS: ReadonlyArray<{
   {
     name: 'crm.opportunity.update',
     version: 1,
-    description: 'Update an opportunity in the tenant CRM.',
+    description: 'Update an opportunity (including stage) in the tenant CRM.',
     riskLevel: 'R2',
     approvalRequired: true,
+  },
+  {
+    name: 'crm.pipeline.read',
+    version: 1,
+    description: 'Read CRM pipelines and stages for the tenant location.',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.conversation.read',
+    version: 1,
+    description: 'Read CRM conversations / message threads (read-only).',
+    riskLevel: 'R1',
+    approvalRequired: false,
+  },
+  {
+    name: 'crm.appointment.read',
+    version: 1,
+    description: 'Read calendar appointments for the tenant CRM (read-only).',
+    riskLevel: 'R1',
+    approvalRequired: false,
   },
   {
     name: 'crm.note.create',
@@ -350,6 +410,62 @@ export function buildMission009Catalog(): ServiceDefinitionType[] {
       consumers: ['mission-009', 'revenue-copilot', 'ghl-client-plane'],
       status: 'active',
       metadata: { mission: '009', catalog: 'v0', provider: 'ghl' },
+    }),
+  );
+}
+
+const APPOINTMENT_WRITE_SPECS: ReadonlyArray<{
+  name: string;
+  version: number;
+  description: string;
+  riskLevel: 'R0' | 'R1' | 'R2' | 'R3';
+  approvalRequired: boolean;
+}> = [
+  {
+    name: 'crm.appointment.create',
+    version: 1,
+    description:
+      'Create a CRM calendar appointment (reserved; inactive until certified).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+  {
+    name: 'crm.appointment.update',
+    version: 1,
+    description:
+      'Update a CRM calendar appointment (reserved; inactive until certified).',
+    riskLevel: 'R2',
+    approvalRequired: true,
+  },
+];
+
+/**
+ * Inactive appointment *write* stubs. Read is active via Mission 009 catalog.
+ */
+export function buildSecureAutomationAppointmentCatalog(): ServiceDefinitionType[] {
+  return APPOINTMENT_WRITE_SPECS.map((spec) =>
+    ServiceDefinition.parse({
+      serviceId: newServiceId(),
+      serviceKey: formatServiceKey(spec.name, spec.version),
+      name: spec.name,
+      version: spec.version,
+      capability: capability(spec.name),
+      owner: 'aion-systems/revenue',
+      description: spec.description,
+      requiredPermissions: [capability(spec.name)],
+      agentCompatibility: ['agent://aion/revenue/', 'revenue', 'agent://aion/crm/', 'crm'],
+      riskLevel: spec.riskLevel,
+      approvalRequired: spec.approvalRequired,
+      evalRefs: [`eval.${spec.name}@1`],
+      consumers: ['secure-automation-l2a', 'mission-009'],
+      status: 'inactive',
+      metadata: {
+        mission: '009',
+        catalog: 'v0',
+        provider: 'ghl',
+        standard: 'SA-STD-001',
+        reservedFor: 'AIO-17',
+      },
     }),
   );
 }

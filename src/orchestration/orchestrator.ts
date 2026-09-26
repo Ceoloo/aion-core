@@ -326,10 +326,21 @@ export class Orchestrator {
     decision: PolicyDecision,
     causationId: EventId,
   ): Promise<OrchestrationResult> {
+    // Stamp tenant + execution at creation: the approval row must never exist
+    // tenant-less (tenant RLS rejects a NULL-tenant write from a tenant-scoped
+    // session, and an unbound approval cannot be isolated or replay-checked).
+    const actor = ctx.command.actor;
+    const tenantId =
+      ctx.command.tenantId ??
+      (actor.actorType === 'agent' ? (actor as AgentActor).tenantId : undefined);
     const approval = await this.deps.approvalGate.request(
       ctx.command,
       ctx.run.runId,
       decision,
+      {
+        ...(tenantId ? { tenantId } : {}),
+        ...(ctx.command.executionId ? { executionId: ctx.command.executionId } : {}),
+      },
     );
     ctx.run = await this.saveRun({
       ...transitionRun(ctx.run, 'awaiting_approval', this.clock),
