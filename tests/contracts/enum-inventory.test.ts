@@ -72,7 +72,7 @@ describe('canonical enum inventory', () => {
       'denied',
       'cancelled',
     ]);
-    expect([...SERVICE_STATUSES]).toEqual(['active', 'deprecated']);
+    expect([...SERVICE_STATUSES]).toEqual(['active', 'inactive', 'deprecated']);
     expect([...EXTERNAL_SIDE_EFFECT_STATUSES]).toEqual([
       'pending',
       'succeeded',
