@@ -146,3 +146,11 @@ export {
   type ControlPlane,
   type ControlPlaneConfig,
 } from './orchestration/control-plane.js';
+export {
+  HarnessDesk,
+  type HarnessDeskDeps,
+  type OpenWorkItemInput,
+  type WakeResult,
+  type HarnessPulseResult,
+  type ReconcileAction,
+} from './orchestration/harness-desk.js';

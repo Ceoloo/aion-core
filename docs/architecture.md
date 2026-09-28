@@ -33,7 +33,7 @@ src/
 ├── execution/       # ExecutionAdapter, ExecutionRegistry, MockExecutionAdapter
 ├── events/          # EventEmitter + in-memory EventSink
 ├── observability/   # Clock, TraceContext, Telemetry + in-memory sink
-├── orchestration/   # run-context, lifecycle state machine, Orchestrator, wiring
+├── orchestration/   # run-context, lifecycle, Orchestrator, HarnessDesk, wiring
 └── index.ts         # the deliberate public API
 ```
 
@@ -108,8 +108,22 @@ contract.
 `execute`). `ExecutionRegistry` resolves the first adapter that can handle a
 request (capability-based routing) and fails fast when none can. Core never sees
 vendor- or model-specific detail: results are normalized to `ExecutionResult`,
-with provider specifics confined to `metadata`. Phase 1 ships only
-`MockExecutionAdapter`.
+with provider specifics confined to `metadata`. Phase 1 ships
+`MockExecutionAdapter` and a `HarnessExecutionAdapter` over the
+`HarnessExecutionProvider` port.
+
+## Harness desk
+
+`HarnessDesk` is how more than one harness shares work without talking to each
+other. A work item's only message is an `AgentHandoff`. `wake` coalesces
+duplicate heartbeats into one pending run. `pulse` checks the ticket out
+synchronously, then submits a command through the `Orchestrator`, so policy
+runs before any adapter. A second pulse while the ticket is held does not
+start another run. The adapter resumes `sessionId` and forwards artifact refs
+by reference; the in-memory provider stops before a run that would pass
+`budgetUnits` and replays an idempotency key instead of executing twice. An
+indeterminate result keeps the checkout until `reconcile`. The desk is
+in-process state, not a broker.
 
 ## Observability
 
