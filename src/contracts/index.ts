@@ -37,3 +37,4 @@ export * from './service-catalog.js';
 export * from './telemetry.js';
 export * from './agent-handoff.js';
 export * from './work-item.js';
+export * from './room.js';

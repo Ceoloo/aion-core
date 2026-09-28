@@ -34,6 +34,7 @@ src/
 ├── events/          # EventEmitter + in-memory EventSink
 ├── observability/   # Clock, TraceContext, Telemetry + in-memory sink
 ├── orchestration/   # run-context, lifecycle, Orchestrator, HarnessDesk, wiring
+├── rooms/           # shared rooms: humans and agents, one timeline
 └── index.ts         # the deliberate public API
 ```
 
@@ -124,6 +125,18 @@ by reference; the in-memory provider stops before a run that would pass
 `budgetUnits` and replays an idempotency key instead of executing twice. An
 indeterminate result keeps the checkout until `reconcile`. The desk is
 in-process state, not a broker.
+
+## Shared room
+
+`SharedRoom` is the workspace where a human and an agent are members of the
+same place. Membership is the gate. `say`, `handoff`, `decision`, and
+`presence` are one timeline, each attributed to the author's own actor. A
+handoff on that timeline is an `AgentHandoff`; it does not authorize
+execution — this module cannot dispatch. An open room accepts a same-tenant
+join. A private room is invite-only. An agent whose tenant does not match the
+room cannot join or be admitted. Entering twice does not write a second
+presence row. `attention` is the short list: mentions, and handoffs addressed
+to that member.
 
 ## Observability
 
