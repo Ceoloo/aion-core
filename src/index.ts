@@ -154,3 +154,8 @@ export {
   type HarnessPulseResult,
   type ReconcileAction,
 } from './orchestration/harness-desk.js';
+export {
+  SharedRoom,
+  type OpenRoomInput,
+  type RoomPost,
+} from './rooms/shared-room.js';
