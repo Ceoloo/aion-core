@@ -33,6 +33,7 @@ export const ID_KIND = {
   ServiceId: 'svc',
   EvaluationId: 'evr',
   HandoffId: 'hof',
+  WorkItemId: 'wit',
 } as const;
 
 export type IdKind = keyof typeof ID_KIND;
@@ -101,6 +102,9 @@ export type EvaluationId = z.infer<typeof EvaluationId>;
 export const HandoffId = idSchema('HandoffId');
 export type HandoffId = z.infer<typeof HandoffId>;
 
+export const WorkItemId = idSchema('WorkItemId');
+export type WorkItemId = z.infer<typeof WorkItemId>;
+
 /**
  * Maps an ID kind to its branded runtime type. Used by {@link generateId} so a
  * single generator can mint any kind while preserving the brand.
@@ -122,6 +126,7 @@ export interface IdTypeMap {
   ServiceId: ServiceId;
   EvaluationId: EvaluationId;
   HandoffId: HandoffId;
+  WorkItemId: WorkItemId;
 }
 
 /**
@@ -159,3 +164,4 @@ export const newExecutionId = (): ExecutionId => generateId('ExecutionId');
 export const newServiceId = (): ServiceId => generateId('ServiceId');
 export const newEvaluationId = (): EvaluationId => generateId('EvaluationId');
 export const newHandoffId = (): HandoffId => generateId('HandoffId');
+export const newWorkItemId = (): WorkItemId => generateId('WorkItemId');

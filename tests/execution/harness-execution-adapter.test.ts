@@ -186,4 +186,55 @@ describe('InMemoryHarnessProvider', () => {
     await provider.cancel({ sessionId: 'sess_1' });
     expect(provider.cancellations).toEqual([{ sessionId: 'sess_1' }]);
   });
+
+  it('resumes an existing session, refuses an unknown one, and stops at the budget', async () => {
+    const provider = new InMemoryHarnessProvider({
+      harnesses: [{ id: 'codex', kind: 'codex' }],
+      usageUnits: 3,
+    });
+    const first = await provider.run({
+      harnessId: 'codex',
+      input: 'start',
+      riskLevel: 'R1',
+      budgetUnits: 5,
+    });
+    expect(first.status).toBe('succeeded');
+    expect(first.sessionId).toMatch(/^sess_mem_/);
+
+    const resumed = await provider.run({
+      harnessId: 'codex',
+      input: 'continue',
+      riskLevel: 'R1',
+      sessionId: first.sessionId,
+      budgetUnits: 5,
+    });
+    expect(resumed.status).toBe('failed');
+    expect(resumed.error?.code).toBe('BUDGET_EXCEEDED');
+    expect(resumed.sessionId).toBe(first.sessionId);
+
+    const missing = await provider.run({
+      harnessId: 'codex',
+      input: 'nope',
+      riskLevel: 'R1',
+      sessionId: 'sess_missing',
+    });
+    expect(missing.status).toBe('failed');
+    expect(missing.error?.code).toBe('SESSION_NOT_FOUND');
+  });
+
+  it('replays an idempotency key instead of running the harness twice', async () => {
+    const provider = new InMemoryHarnessProvider({
+      harnesses: [{ id: 'codex', kind: 'codex' }],
+    });
+    const request = {
+      harnessId: 'codex',
+      input: 'once',
+      riskLevel: 'R1' as const,
+      idempotencyKey: 'req_same',
+    };
+    const first = await provider.run(request);
+    const second = await provider.run(request);
+    expect(second).toEqual(first);
+    expect(provider.calls).toHaveLength(1);
+  });
 });

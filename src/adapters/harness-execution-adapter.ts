@@ -1,6 +1,7 @@
 import type { ExecutionAdapter, ExecutionRequest } from '../execution/execution-adapter.js';
 import type { ExecutionResult } from '../contracts/result.js';
 import type { Command } from '../contracts/command.js';
+import { AgentHandoff } from '../contracts/agent-handoff.js';
 import type { Clock } from '../observability/clock.js';
 import { systemClock } from '../observability/clock.js';
 import type {
@@ -82,6 +83,9 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
     }
 
     const model = stringMeta(request.command, 'model');
+    const sessionId = stringMeta(request.command, 'sessionId');
+    const handoff = handoffFrom(request.command);
+    const fileRefs = handoff?.artifactRefs.map((artifact) => artifact.ref);
     // Budget: the authorized actor's costBudget is the ceiling, NOT the
     // caller-supplied metadata (which the policy path does not validate). Clamp
     // to it, and default to it when metadata omits a budget, so a budgeted agent
@@ -90,19 +94,22 @@ export class HarnessExecutionAdapter implements ExecutionAdapter {
       numberMeta(request.command, 'budgetUnits'),
       actorCostBudget(request.command),
     );
+    const contextReference =
+      request.contextReference ??
+      (handoff ? `handoff:${handoff.handoffId}` : undefined);
     const runRequest: HarnessRunRequest = {
       harnessId,
-      input: harnessInput(request.command),
+      input: harnessInput(request.command, handoff),
       riskLevel: request.riskLevel,
       runId: request.runId,
       requestId: request.requestId,
       // Stable de-dup key so a retry after an indeterminate outcome does not
       // re-run side effects; the requestId is stable per authorized request.
       idempotencyKey: request.requestId,
-      ...(request.contextReference !== undefined
-        ? { contextReference: request.contextReference }
-        : {}),
+      ...(contextReference !== undefined ? { contextReference } : {}),
       ...(model !== undefined ? { model } : {}),
+      ...(sessionId !== undefined ? { sessionId } : {}),
+      ...(fileRefs !== undefined && fileRefs.length > 0 ? { fileRefs } : {}),
       ...(budgetUnits !== undefined ? { budgetUnits } : {}),
     };
 
@@ -205,10 +212,25 @@ function effectiveBudget(requested: number | undefined, ceiling: number | undefi
   return requested === undefined ? ceiling : Math.min(requested, ceiling);
 }
 
-/** The goal handed to the harness: an explicit `payload.goal`, else the command name. */
-function harnessInput(command: Command): string {
+/**
+ * The goal handed to the harness. An explicit `payload.goal` wins. Otherwise
+ * the handoff `need` is the instruction. Facts stay on the work item; the
+ * seam carries `contextReference` (`handoff:<id>`) and artifact `fileRefs`.
+ */
+function harnessInput(
+  command: Command,
+  handoff: ReturnType<typeof handoffFrom>,
+): string {
   const goal = command.payload['goal'];
-  return typeof goal === 'string' && goal.length > 0 ? goal : command.name;
+  if (typeof goal === 'string' && goal.length > 0) return goal;
+  if (handoff) return handoff.need;
+  return command.name;
+}
+
+/** The AgentHandoff on the command, when the payload carries a valid one. */
+function handoffFrom(command: Command) {
+  const parsed = AgentHandoff.safeParse(command.payload['handoff']);
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** A non-empty string metadata field, else undefined. */
