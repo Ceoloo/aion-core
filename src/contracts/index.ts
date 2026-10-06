@@ -10,6 +10,7 @@ export * from './autonomy.js';
 export * from './action-tier.js';
 export * from './agent-identity.js';
 export * from './capability.js';
+export * from './agent-registry.js';
 export * from './actor.js';
 export * from './agent-trust-score.js';
 export * from './scope.js';

@@ -5,6 +5,11 @@ import { RiskLevel } from './risk.js';
 import { AutonomyLevel } from './autonomy.js';
 import { ActionTier } from './action-tier.js';
 import { AgentUri } from './agent-identity.js';
+import { DelegatedAuthority } from './authority.js';
+import {
+  RegistryEnvironment,
+  RevocationState,
+} from './agent-registry.js';
 
 /**
  * Actor model.
@@ -86,14 +91,43 @@ export const AgentActor = ActorBase.extend({
   /** Declared autonomy ceiling; never raised by the worker itself. */
   autonomyLevel: AutonomyLevel.default('L1'),
   /**
-   * Product Action Tier (ADR-007). When omitted, PolicyEngine derives from
-   * autonomyLevel (L0→observe, L1→assist, L2–L4→execute).
+   * Product Action Tier (ADR-007) — SIS `permission_tier`.
+   * When omitted, PolicyEngine derives from autonomyLevel
+   * (L0→observe, L1→assist, L2–L4→execute). Required for SIS-AG-02 completeness.
    */
   actionTier: ActionTier.optional(),
   /** Conditions under which the agent must stop and escalate to a human. */
   escalationConditions: z.array(z.string()).default([]),
-  /** Data scopes this agent may read/write — least privilege. */
+  /** Data scopes this agent may read/write — least privilege (SIS `data_scope`). */
   allowedData: z.array(z.string()).default([]),
+  /**
+   * Traceable delegated authority for this agent (SIS `delegated_authority`).
+   * Required for SIS-AG-02 completeness before Execute-tier work.
+   */
+  delegatedAuthority: DelegatedAuthority.optional(),
+  /**
+   * Policy bundle / version governing this agent (SIS `policy_version`).
+   * Required for SIS-AG-02 completeness.
+   */
+  policyVersion: z.string().min(1).optional(),
+  /**
+   * Link/path to attributable run / audit records (SIS `execution_evidence`).
+   * Typically a gateway query template or ledger prefix. Required for SIS-AG-02.
+   */
+  executionEvidence: z.string().min(1).optional(),
+  /**
+   * Containment state (SIS `revocation_state`). Defaults to `active`.
+   * Suspended / revoked agents fail closed at the policy boundary.
+   */
+  revocationState: RevocationState.default('active'),
+  /** Deployment posture label (development / staging / production). */
+  environment: RegistryEnvironment.optional(),
+  /** How this agent obtains credentials (vault / short-lived / delegated / …). */
+  credentialMethod: z.string().min(1).optional(),
+  /** Human-approval requirements declared at registration. */
+  approvalRequirements: z.array(z.string()).default([]),
+  /** Last observed activity timestamp (ISO-8601), updated by Runtime. */
+  lastActivity: z.string().datetime().optional(),
   /** Shape of work this agent accepts (contract name or schema ref). */
   inputContract: z.string().min(1).optional(),
   /** Shape of results this agent returns (contract name or schema ref). */
