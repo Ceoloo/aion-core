@@ -11,6 +11,8 @@ export * from './action-tier.js';
 export * from './agent-identity.js';
 export * from './capability.js';
 export * from './actor.js';
+// After Actor — registry completeness projects AgentActor → SIS record.
+export * from './agent-registry.js';
 export * from './agent-trust-score.js';
 export * from './scope.js';
 export * from './tool.js';

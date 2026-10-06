@@ -5,6 +5,7 @@ import { RiskLevel } from './risk.js';
 import { AutonomyLevel } from './autonomy.js';
 import { ActionTier } from './action-tier.js';
 import { AgentUri } from './agent-identity.js';
+import { AuthorityId } from './authority.js';
 
 /**
  * Actor model.
@@ -104,6 +105,30 @@ export const AgentActor = ActorBase.extend({
   observabilityRequirements: z.array(z.string()).default([]),
   /** Cost ceiling (abstract units) for a single unit of work. */
   costBudget: z.number().nonnegative().optional(),
+
+  // ── Agent Identity Registry fields (AIO-44 / SIS-AG-02) ──────────────────
+  // Optional on the Actor contract for migration compatibility; production
+  // inventory requires completeness via assertAgentRegistryComplete().
+  /** Bound delegated authority id when a durable Authority record exists. */
+  delegatedAuthorityId: AuthorityId.optional(),
+  /** Human-readable / evidence string for delegated authority (mandatory for registry). */
+  delegatedAuthorityEvidence: z.string().min(1).optional(),
+  /** Policy bundle / version governing this agent. */
+  policyVersion: z.string().min(1).optional(),
+  /** Pointer to attributable execution / audit evidence. */
+  executionEvidence: z.string().min(1).optional(),
+  /** Containment / revoke state. Defaults treated as active when omitted. */
+  revocationState: z.enum(['active', 'suspended', 'revoked']).optional(),
+  /** Deployment environment this registration targets. */
+  environment: z
+    .enum(['development', 'staging', 'production'])
+    .optional(),
+  /** How the agent authenticates (API key, SPIFFE, OAuth, …). */
+  credentialMethod: z.string().min(1).optional(),
+  /** Human-approval requirements declared at registration. */
+  approvalRequirements: z.array(z.string().min(1)).default([]),
+  /** Last observed activity (ISO datetime). */
+  lastActivityAt: z.string().datetime().optional(),
 });
 
 export const HumanActor = ActorBase.extend({
