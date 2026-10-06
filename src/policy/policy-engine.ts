@@ -36,6 +36,10 @@ import {
   requiredActionTierForCapability,
   type ActionTier,
 } from '../contracts/action-tier.js';
+import {
+  registryAllowsExecution,
+  registryCompleteness,
+} from '../contracts/agent-registry.js';
 
 export interface PolicyEngineConfig {
   /** Identifier recorded on every decision this engine produces. */
@@ -92,6 +96,12 @@ export interface AuthorizeContext {
    * consequential (R2+) action — the engine fails closed.
    */
   authorityProvenance?: Provenance;
+  /**
+   * When true, Execute-tier capabilities require a complete SIS-AG-02 registry
+   * record (AIO-44). Runtime sets this for auth mode=required production paths.
+   * Local proofs may omit it during migration; revoked/suspended always deny.
+   */
+  requireRegistryCompleteness?: boolean;
   /** ISO timestamp override for deterministic tests. */
   now?: string;
 }
@@ -318,6 +328,37 @@ export class PolicyEngine {
     checks.push({ kind: 'identity', passed: identityOk, detail: identityDetail });
     if (!identityOk) {
       return this.deny(identityDetail, riskLevel, checks);
+    }
+
+    // 2b. Agent Identity Registry (AIO-44 / SIS-AG-02 / SIS-AG-09).
+    // Revoked/suspended agents always fail closed. Execute-tier completeness
+    // is enforced when Runtime opts in (auth mode=required) or the agent has
+    // already adopted registry fields (policyVersion set).
+    if (actor.actorType === 'agent') {
+      const agent = actor as AgentActor;
+      const active = registryAllowsExecution(agent);
+      const state = agent.revocationState ?? 'active';
+      if (!active) {
+        const detail = `registry denied: agent revocation_state=${state}`;
+        checks.push({ kind: 'registry', passed: false, detail });
+        return this.deny(detail, riskLevel, checks);
+      }
+      const requiredTier = requiredActionTierForCapability(String(capability));
+      const completeness = registryCompleteness(agent);
+      const enforceComplete =
+        Boolean(ctx.requireRegistryCompleteness) || Boolean(agent.policyVersion);
+      if (requiredTier === 'execute' && enforceComplete && !completeness.ok) {
+        const detail = `registry denied: Execute-tier requires complete SIS-AG-02 fields (${completeness.detail})`;
+        checks.push({ kind: 'registry', passed: false, detail });
+        return this.deny(detail, riskLevel, checks);
+      }
+      checks.push({
+        kind: 'registry',
+        passed: true,
+        detail: completeness.ok
+          ? `registry ok (revocation_state=${state}, SIS-AG-02 complete)`
+          : `registry ok (revocation_state=${state}; SIS-AG-02 incomplete: ${completeness.missing.join(', ')})`,
+      });
     }
 
     // 2a. Provenance — the authority/instruction driving this request must come
