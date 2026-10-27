@@ -51,7 +51,7 @@ export const PROTOTYPE_ASSURANCE_CHECK_IDS = [
   'CA-RV-02',
 ] as const;
 
-/** Full catalog IDs from continuous-assurance-v1.md §2. */
+/** Full catalog IDs from continuous-assurance-v1.md §2 (incl. 2026-10-26 amendments). */
 export const ASSURANCE_CHECK_IDS = [
   'CA-EXP-01',
   'CA-EXP-02',
@@ -76,6 +76,16 @@ export const ASSURANCE_CHECK_IDS = [
   'CA-VN-02',
   'CA-RV-01',
   'CA-RV-02',
+  'CA-SC-01',
+  'CA-SC-02',
+  'CA-SC-03',
+  'CA-TR-01',
+  'CA-TR-02',
+  'CA-BK-03',
+  'CA-BK-04',
+  'CA-RR-01',
+  'CA-NW-01',
+  'CA-WEB-01',
 ] as const;
 export const AssuranceCheckId = z.enum(ASSURANCE_CHECK_IDS);
 export type AssuranceCheckId = z.infer<typeof AssuranceCheckId>;
@@ -115,6 +125,16 @@ export const ASSURANCE_CHECK_CATALOG: readonly AssuranceCheckDefinition[] = [
   { checkId: 'CA-VN-02', domain: 'vulnerabilities', title: 'High CVE unpatched past SLA', cadence: 'weekly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03'] },
   { checkId: 'CA-RV-01', domain: 'revoke_readiness', title: 'Agent revoke/contain tabletop stale (>90d)', cadence: 'monthly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-AG-09'] },
   { checkId: 'CA-RV-02', domain: 'revoke_readiness', title: 'Suspended/revoked agent still executing', cadence: 'continuous', failSeverity: 'critical', prototype: true, sisControls: ['SIS-CA-03', 'SIS-AG-09', 'SIS-GX-10'] },
+  { checkId: 'CA-SC-01', domain: 'supply_chain', title: 'Production image/service not digest-pinned', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-SC-02'] },
+  { checkId: 'CA-SC-02', domain: 'supply_chain', title: 'Known-bad package/version in dependency inventory', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-SC-01'] },
+  { checkId: 'CA-SC-03', domain: 'supply_chain', title: 'CI standing master key / over-privileged token detected', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-SC-04'] },
+  { checkId: 'CA-TR-01', domain: 'trust_pki', title: 'Trust-store includes blocked intermediate/root', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-TR-02', 'SIS-TR-05'] },
+  { checkId: 'CA-TR-02', domain: 'trust_pki', title: 'Certificate issuer not on approved inventory', cadence: 'weekly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-TR-01'] },
+  { checkId: 'CA-BK-03', domain: 'backup', title: 'Immutable or offline backup copy missing', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-BK-02', 'SIS-BK-05'] },
+  { checkId: 'CA-BK-04', domain: 'backup', title: 'Ransomware-scenario restore drill stale (>90d)', cadence: 'monthly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-BK-03', 'SIS-BK-05'] },
+  { checkId: 'CA-RR-01', domain: 'ransomware_resilience', title: 'Gap in MFA / VPN exposure / EDR / segmentation / backup verify set', cadence: 'weekly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-BK-05'] },
+  { checkId: 'CA-NW-01', domain: 'network_management_plane', title: 'Critical CVE on orchestrator / controller (internet or vendor-admin exposed)', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-NW-05'] },
+  { checkId: 'CA-WEB-01', domain: 'web_infrastructure', title: 'Internet-facing web runtime below patched security release', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-WEB-01', 'SIS-WEB-04'] },
 ] as const;
 
 export const AssuranceEvidenceId = z
