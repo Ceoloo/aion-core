@@ -161,6 +161,10 @@ decidedBy })` to resume the **same** run.
 
 ---
 
+## Canonical entities (AIO-10)
+
+Versioned, tenant-scoped schemas for Agent, Workforce, Task, Workflow, Event, Policy, Memory, LearningSignal, Outcome, Customer, Opportunity and EconomicValue (`schemaVersion: "1"`). This is an additive layer; see [docs/canonical-entities.md](docs/canonical-entities.md).
+
 ## Lifecycle (run states)
 
 ```
