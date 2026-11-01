@@ -40,3 +40,4 @@ export * from './telemetry.js';
 export * from './agent-handoff.js';
 export * from './work-item.js';
 export * from './room.js';
+export * from './canonical-entities.js';
