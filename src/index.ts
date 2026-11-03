@@ -111,6 +111,20 @@ export {
   HarnessExecutionAdapter,
   type HarnessExecutionAdapterOptions,
 } from './adapters/harness-execution-adapter.js';
+export {
+  HARNESS_ARENA_MIN_SAMPLES,
+  HARNESS_ARENA_MIN_SUCCESS_RATE,
+  HARNESS_ARENA_MIN_QUALITY,
+  harnessConfigurationIdentity,
+  buildHarnessConfigurationScorecards,
+  rankHarnessConfigurationScorecards,
+  recommendHarnessConfiguration,
+  type HarnessConfigurationKey,
+  type HarnessConfigurationObservation,
+  type HarnessConfigurationScorecard,
+  type HarnessArenaRecommendation,
+  type RecommendHarnessConfigurationInput,
+} from './execution/harness-arena.js';
 
 // ── Orchestration kernel ────────────────────────────────────────────────────
 export {
