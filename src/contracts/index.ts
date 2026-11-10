@@ -12,6 +12,7 @@ export * from './agent-identity.js';
 export * from './capability.js';
 export * from './agent-registry.js';
 export * from './continuous-assurance.js';
+export * from './agent-security-evidence.js';
 export * from './actor.js';
 export * from './agent-trust-score.js';
 export * from './scope.js';
