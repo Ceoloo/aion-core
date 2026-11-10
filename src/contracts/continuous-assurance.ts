@@ -18,6 +18,7 @@ export const ASSURANCE_CADENCES = [
   'daily',
   'weekly',
   'monthly',
+  'quarterly',
 ] as const;
 export const AssuranceCadence = z.enum(ASSURANCE_CADENCES);
 export type AssuranceCadence = z.infer<typeof AssuranceCadence>;
@@ -51,7 +52,7 @@ export const PROTOTYPE_ASSURANCE_CHECK_IDS = [
   'CA-RV-02',
 ] as const;
 
-/** Full catalog IDs from continuous-assurance-v1.md §2 (incl. 2026-10-26 amendments). */
+/** Full catalog IDs from continuous-assurance-v1.md §2 (incl. 2026-11-09 amendments). */
 export const ASSURANCE_CHECK_IDS = [
   'CA-EXP-01',
   'CA-EXP-02',
@@ -70,6 +71,8 @@ export const ASSURANCE_CHECK_IDS = [
   'CA-AG-02',
   'CA-AG-03',
   'CA-AG-04',
+  'CA-AG-05',
+  'CA-AG-06',
   'CA-RT-01',
   'CA-RT-02',
   'CA-VN-01',
@@ -86,6 +89,8 @@ export const ASSURANCE_CHECK_IDS = [
   'CA-RR-01',
   'CA-NW-01',
   'CA-WEB-01',
+  'CA-AP-01',
+  'CA-AP-02',
 ] as const;
 export const AssuranceCheckId = z.enum(ASSURANCE_CHECK_IDS);
 export type AssuranceCheckId = z.infer<typeof AssuranceCheckId>;
@@ -119,6 +124,8 @@ export const ASSURANCE_CHECK_CATALOG: readonly AssuranceCheckDefinition[] = [
   { checkId: 'CA-AG-02', domain: 'agent_permission', title: 'Observed agent not in registry (SIS-AG-10)', cadence: 'continuous', failSeverity: 'critical', prototype: true, sisControls: ['SIS-CA-03', 'SIS-AG-10'] },
   { checkId: 'CA-AG-03', domain: 'agent_permission', title: 'Tools / data_scope / policy_version drift vs registry', cadence: 'daily', failSeverity: 'high', prototype: true, sisControls: ['SIS-CA-03', 'SIS-AG-05', 'SIS-AG-08'] },
   { checkId: 'CA-AG-04', domain: 'agent_behavior', title: 'Trust Score / deny spikes for tenant', cadence: 'continuous', failSeverity: 'medium', prototype: true, sisControls: ['SIS-CA-03', 'SIS-AG-06'] },
+  { checkId: 'CA-AG-05', domain: 'agent_behavior', title: 'Consequential execution missing Agent Security Evidence Contract fields', cadence: 'continuous', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-GX-08'] },
+  { checkId: 'CA-AG-06', domain: 'agent_behavior', title: 'Periodic ASE-* retest stale for Execute-tier agents (>90d)', cadence: 'monthly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-GX-08'] },
   { checkId: 'CA-RT-01', domain: 'runtime', title: 'Gateway / Runtime health + FeatureGate kill path', cadence: 'continuous', failSeverity: 'high', prototype: true, sisControls: ['SIS-CA-03', 'SIS-GX-10'] },
   { checkId: 'CA-RT-02', domain: 'runtime', title: 'Endpoint protection coverage gap', cadence: 'daily', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-DV-01'] },
   { checkId: 'CA-VN-01', domain: 'vulnerabilities', title: 'Critical CVE on internet-facing or agent host', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03'] },
@@ -135,6 +142,8 @@ export const ASSURANCE_CHECK_CATALOG: readonly AssuranceCheckDefinition[] = [
   { checkId: 'CA-RR-01', domain: 'ransomware_resilience', title: 'Gap in MFA / VPN exposure / EDR / segmentation / backup verify set', cadence: 'weekly', failSeverity: 'high', prototype: false, sisControls: ['SIS-CA-03', 'SIS-BK-05'] },
   { checkId: 'CA-NW-01', domain: 'network_management_plane', title: 'Critical CVE on orchestrator / controller (internet or vendor-admin exposed)', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-NW-05'] },
   { checkId: 'CA-WEB-01', domain: 'web_infrastructure', title: 'Internet-facing web runtime below patched security release', cadence: 'daily', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-WEB-01', 'SIS-WEB-04'] },
+  { checkId: 'CA-AP-01', domain: 'auth_path', title: 'Remote-access auth path undermines intended MFA (alternate method bypass)', cadence: 'quarterly', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-HI-01', 'SIS-NW-02'] },
+  { checkId: 'CA-AP-02', domain: 'auth_path', title: 'VPN / firewall firmware below vendor-fixed security release on internet-facing SSL VPN', cadence: 'weekly', failSeverity: 'critical', prototype: false, sisControls: ['SIS-CA-03', 'SIS-NW-02'] },
 ] as const;
 
 export const AssuranceEvidenceId = z
